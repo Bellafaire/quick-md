@@ -7,20 +7,24 @@ class ConfigurationManager:
     def __init__(self):
         # get path to this script
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
-        self.config_path = os.path.join(self.script_dir, '../.qmd_conf')
+        self.config_path = os.path.abspath(os.path.join(self.script_dir, '../.qmd_conf'))
 
         self.config = self.load_config()
         self.check_config()
         self.sub_config_paths()
 
+        print(self.config)
+
     def get_default_config(self):
+        # the paths are a little wonky for now. 
         return {
             "local": {
-                "md_path": "../",
-                "images_path": "../images", 
-                "videos_path": "../videos", 
-                "figures_path": "../figures", 
-                "files_path": "../files"
+                "md_path": "../../",
+                "images_path": "../../images", 
+                "videos_path": "../../videos", 
+                "figures_path": "../../figures", 
+                "files_path": "../../files", 
+                "main_md": "../../main.md"
             }, 
             "global": {
                 "images_dir": "~/Pictures",
@@ -43,7 +47,8 @@ class ConfigurationManager:
         self.check_config()
         for section, options in self.config.items():
             for option, path in options.items():
-                abs_path = os.path.abspath(os.path.join(self.script_dir, path))
+                abs_path = os.path.abspath(os.path.join(self.script_dir, os.path.expanduser(path)))
+                abs_path = os.path.normpath(abs_path)
                 self.config[section][option] = abs_path
 
     def load_config(self):
