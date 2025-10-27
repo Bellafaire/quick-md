@@ -27,7 +27,7 @@ class ConfigurationManager:
                 "main_md": "../../main.md"
             }, 
             "global": {
-                "images_dir": "~/Pictures",
+                "images_dir": "~/Pictures/Screenshots/",
                 "videos_dir": "~/Videos"
             }
         }
