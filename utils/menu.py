@@ -1,4 +1,7 @@
 from datetime import datetime
+import random
+import subprocess
+import string
 import os
 import yaml
 import pyperclip
@@ -110,6 +113,68 @@ class Menu:
 
         input(f"New page created at {filepath}. Press Enter to continue...")
 
+    def add_video(self):
+        # Get the most recent video from the global videos directory
+        video_path = self.get_most_recent_file_in_directory(self.configuration_manager.config['global']['videos_dir'])
+        print("Found video: ", video_path)
+        title = input("Enter new video name (x to cancel): ")
+        if title.lower() == 'x':
+            return
+            
+        ext = ".webm" # webm for smaller file sizes  
+        dest_folder = self.configuration_manager.config['local']['videos_path']
 
+        # make videos directory if it doesn't exist
+        os.makedirs(dest_folder, exist_ok=True)
 
+        new_name = self.get_date_string_prepend() + "_" + title.lower().replace(" ", "_") + ext
+        new_name = os.path.join(dest_folder, new_name)
+
+        if video_path:
+            resolutions = {"1": "480p", "2": "720p", "3": "1080p"}
+            compression = {"1": "low", "2": "medium", "3": "high"}
+
+            print("Select resolution:")
+            for key, value in resolutions.items():
+                print(f"{key}: {value}")
+            resolution_choice = input("Enter choice (1-3): ")
+
+            print("Select compression level:")
+            for key, value in compression.items():
+                print(f"{key}: {value}")
+            compression_choice = input("Enter choice (1-3): ")
+
+            if (resolution_choice not in resolutions) or (compression_choice not in compression):
+                print("Invalid choice. Aborting.")
+                return
+
+            resolution = resolutions[resolution_choice]
+            compression_level = compression[compression_choice]
+
+            # Define output path in /tmp/
+            random_string = ''.join(random.choices(string.ascii_letters, k=20))
+            temp_path = f"/tmp/{random_string}{ext}" # one day someone will file a bug report because of a 1 in 52^20 chance of collision
+
+            # Build ffmpeg command
+            ffmpeg_cmd = [
+                "ffmpeg", "-i", "\"%s\"" % video_path,
+                "-vf", f"scale=-2:{resolution[:-1]}",
+                "-preset", compression_level,
+                temp_path
+            ]
+
+            # Run ffmpeg in the background and copy result to the global videos directory
+            subprocess.Popen(
+                f"{' '.join(ffmpeg_cmd)} && cp {temp_path} {new_name}",
+                shell=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+
+            # Copy video tag to clipboard
+            relative_path = os.path.relpath(f'{new_name}', start=self.configuration_manager.config['local']['md_path'])
+         
+            video_tag = f'<video width="640" loop autoplay controls><source src="{relative_path}" type="video/mp4"></video>'
+            pyperclip.copy(video_tag)
 
