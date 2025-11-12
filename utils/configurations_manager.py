@@ -7,16 +7,37 @@ class ConfigurationManager:
     def __init__(self):
         # get path to this script
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
-        self.config_path = os.path.abspath(os.path.join(self.script_dir, '../.qmd_conf'))
+        self.config_path = os.path.abspath(os.path.join(self.script_dir, '../../.qmd_conf'))
 
         self.config = self.load_config()
         self.check_config()
+
+        # check if the config file exists, if not prompt to create one
+        if not os.path.exists(self.config_path):
+
+            # show the default yaml file and confirm the user wants to save it
+            print("Default Configuration: \n", yaml.dump(self.config, default_flow_style=False))
+            print("Would you like to save the above configuration file? (y/n): ", end="")
+
+            if 'y' in input().strip().lower():
+                self.save_config()
+                print("Default configuration saved to", self.config_path)
+
+            print("You can modify the configuration file directly at this path later.")
+
+            # allow exit
+            print("Would you like to exit? (y/n): ", end="")
+            if 'y' in input().strip().lower():
+                exit(0)
+
         self.sub_config_paths()
 
-        print(self.config)
+        #print(self.config)
 
     def get_default_config(self):
         # the paths are a little wonky for now. 
+        # TODO: global paths should be imported from an environment variable or similar these are the locations 
+        # where the user stores their images/videos generally on their system. 
         return {
             "local": {
                 "md_path": "../../",
