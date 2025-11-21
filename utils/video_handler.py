@@ -136,6 +136,9 @@ def add_video(config_manager, filename, resolution, compression_level,
     relative_path = os.path.relpath(dest_path, start=md_path)
     video_tag = create_video_html_tag(relative_path, width=video_width)
     
+    # Save to config
+    config_manager.add_video_to_config(relative_path)
+    
     # Copy to clipboard
     clipboard_success = copy_video_tag_to_clipboard(video_tag)
     

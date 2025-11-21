@@ -63,8 +63,12 @@ def add_image(config_manager, filename, alt_text, relative_images_dir="images"):
     except Exception as e:
         return (False, f"Failed to copy image: {str(e)}", None)
     
-    # Create markdown link
-    markdown_link = create_markdown_image_link(alt_text, f"{relative_images_dir}/{filename}")
+    # Create markdown link and relative path
+    relative_path = f"{relative_images_dir}/{filename}"
+    markdown_link = create_markdown_image_link(alt_text, relative_path)
+    
+    # Save to config
+    config_manager.add_image_to_config(relative_path)
     
     # Copy to clipboard
     clipboard_success = copy_markdown_link_to_clipboard(markdown_link)

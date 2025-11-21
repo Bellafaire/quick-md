@@ -50,7 +50,10 @@ class ConfigurationManager:
             "global": {
                 "images_dir": "~/Pictures/Screenshots/",
                 "videos_dir": "~/Videos"
-            }
+            },
+            "Images": [],
+            "Videos": [],
+            "Markdown": []
         }
 
     def check_config(self): 
@@ -60,17 +63,25 @@ class ConfigurationManager:
             if section not in self.config:
                 self.config[section] = options
             else:
-                for option, value in options.items():
-                    if option not in self.config[section]:
-                        self.config[section][option] = value
+                # Handle dictionary sections (local, global)
+                if isinstance(options, dict):
+                    for option, value in options.items():
+                        if option not in self.config[section]:
+                            self.config[section][option] = value
+                # Handle list sections (Images, Videos, Markdown)
+                elif isinstance(options, list):
+                    if not isinstance(self.config[section], list):
+                        self.config[section] = options
 
     def sub_config_paths(self):
         self.check_config()
         for section, options in self.config.items():
-            for option, path in options.items():
-                abs_path = os.path.abspath(os.path.join(self.script_dir, os.path.expanduser(path)))
-                abs_path = os.path.normpath(abs_path)
-                self.config[section][option] = abs_path
+            # Only process dictionary sections (local, global) for path substitution
+            if isinstance(options, dict):
+                for option, path in options.items():
+                    abs_path = os.path.abspath(os.path.join(self.script_dir, os.path.expanduser(path)))
+                    abs_path = os.path.normpath(abs_path)
+                    self.config[section][option] = abs_path
 
     def load_config(self):
         if os.path.exists(self.config_path):
@@ -81,5 +92,29 @@ class ConfigurationManager:
     def save_config(self):
         with open(self.config_path, 'w') as file:
             yaml.safe_dump(self.config, file)
+    
+    def add_image_to_config(self, relative_path):
+        """Add an image path to the Images list in config"""
+        if "Images" not in self.config:
+            self.config["Images"] = []
+        if relative_path not in self.config["Images"]:
+            self.config["Images"].append(relative_path)
+            self.save_config()
+    
+    def add_video_to_config(self, relative_path):
+        """Add a video path to the Videos list in config"""
+        if "Videos" not in self.config:
+            self.config["Videos"] = []
+        if relative_path not in self.config["Videos"]:
+            self.config["Videos"].append(relative_path)
+            self.save_config()
+    
+    def add_markdown_to_config(self, relative_path):
+        """Add a markdown path to the Markdown list in config"""
+        if "Markdown" not in self.config:
+            self.config["Markdown"] = []
+        if relative_path not in self.config["Markdown"]:
+            self.config["Markdown"].append(relative_path)
+            self.save_config()
 
 
