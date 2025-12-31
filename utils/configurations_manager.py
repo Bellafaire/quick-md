@@ -1,6 +1,7 @@
 import os
 import yaml
 from tkinter import Tk, filedialog
+from datetime import datetime
 
 
 class ConfigurationManager:
@@ -59,19 +60,23 @@ class ConfigurationManager:
     def check_config(self): 
         #confirm that all config options in default are present in self.config, if not use default
         default_config = self.get_default_config()
-        for section, options in default_config.items():
-            if section not in self.config:
-                self.config[section] = options
+
+        for field, value in default_config.items():
+
+            # add any missing fields with default
+            if field not in self.config:
+                self.config[field] = value
+
             else:
-                # Handle dictionary sections (local, global)
-                if isinstance(options, dict):
-                    for option, value in options.items():
-                        if option not in self.config[section]:
-                            self.config[section][option] = value
-                # Handle list sections (Images, Videos, Markdown)
-                elif isinstance(options, list):
-                    if not isinstance(self.config[section], list):
-                        self.config[section] = options
+                # Handle dictionary fields (local, global)
+                if isinstance(value, dict):
+                    for option, value in value.items():
+                        if option not in self.config[field]:
+                            self.config[field][option] = value
+                # Handle list fields (Images, Videos, Markdown)
+                elif isinstance(value, list):
+                    if not isinstance(self.config[field], list):
+                        self.config[field] = value
 
     def sub_config_paths(self):
         self.check_config()
@@ -116,5 +121,20 @@ class ConfigurationManager:
         if relative_path not in self.config["Markdown"]:
             self.config["Markdown"].append(relative_path)
             self.save_config()
+
+    def sanitize_filename(self, name, extension="", prepend_date=True):
+        """Convert a name to snake_case, optionally prepend date, and add extension"""
+        sanitized = name.lower().replace(" ", "_")
+        if prepend_date:
+            sanitized = self.get_date_string_prepend() + "_" + sanitized
+        if extension:
+            sanitized += extension
+        return sanitized
+   
+    def get_date_string_prepend(self):
+        return datetime.now().strftime("%Y_%m_%d")
+
+    def get_date_string(self):
+        return datetime.now().strftime("%m/%d/%Y")
 
 
