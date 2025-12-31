@@ -1,14 +1,15 @@
 from datetime import datetime
 import os
 from utils import image_handler
-from utils import video_handler
 from textual.app import App, ComposeResult
 from textual.containers import Container, Center, Middle
 from textual.widgets import Static, Button, Input, Label
 from textual.binding import Binding
 from textual.screen import Screen
+from textual.events import Key
 
 from utils.new_page_menu import NewPageMenu
+from utils.new_image_menu import NewImageMenu
 
 class Menu:
     def __init__(self, configuration_manager):
@@ -17,10 +18,10 @@ class Menu:
         self.options = [
             "New Page", 
             "Add Image", 
-            "Add Video",
-            "Search Images",
-            "Search Videos",
-            "Search Markdown",
+            #"Add Video",
+            #"Search Images",
+            #"Search Videos",
+            #"Search Markdown",
             "Exit"
         ]
     
@@ -50,6 +51,14 @@ class MenuApp(App):
         width: 100%;
         margin: 0;
     }
+    
+    Button:focus {
+        background: $panel;
+    }
+    
+    Button:hover {
+        background: $accent;
+    }
     """
     
     BINDINGS = [
@@ -76,7 +85,9 @@ class MenuApp(App):
                 with Container(id="menu_container"):
                     yield Static("Select an option:", id="title")
                     for idx, option in enumerate(self.options, start=1):
-                        yield Button(f"{idx}. {option}", id=f"btn_{idx}")
+                        button = Button(f"{idx}. {option}", id=f"btn_{idx}")
+                        button.can_focus = False
+                        yield button
     
     def on_button_pressed(self, event: Button.Pressed) -> None:
         # Only handle buttons from the main menu (they start with "btn_")
@@ -98,7 +109,7 @@ class MenuApp(App):
         elif option == "New Page":
             self.push_screen(NewPageMenu(self.menu_instance, self.configuration_manager))
         elif option == "Add Image":
-            # TODO: Implement add image
+            self.push_screen(NewImageMenu(self.menu_instance, self.configuration_manager))
             pass
         elif option == "Add Video":
             # TODO: Implement add video
@@ -156,32 +167,6 @@ class MenuApp(App):
     #def get_date_string(self):
     #    return datetime.now().strftime("%m/%d/%Y")
 
-    #def add_image(self):
-    #    source_dir = self.configuration_manager.config['global']['images_dir']
-    #    
-    #    # Check if there's a recent image first
-    #    recent_image = image_handler.get_most_recent_file_in_directory(source_dir)
-    #    if not recent_image:
-    #        input("No images found in the specified directory. Press Enter to continue...")
-    #        return
-    #    
-    #    print("Found image: ", recent_image)
-    #    new_name = input("Enter new image name (x to cancel): ")
-
-    #    if new_name.lower() == 'x':
-    #        return
-
-    #    ext = os.path.splitext(recent_image)[1]
-    #    new_filename = self.sanitize_filename(new_name, extension=ext)
-    #    
-    #    success, message, markdown_link = image_handler.add_image(
-    #        config_manager=self.configuration_manager,
-    #        filename=new_filename,
-    #        alt_text=new_name,
-    #        relative_images_dir="images"
-    #    )
-    #    
-    #    input(f"{message}\nPress Enter to continue...")
 
 
     #def add_video(self):

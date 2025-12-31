@@ -3,7 +3,6 @@ import yaml
 from tkinter import Tk, filedialog
 from datetime import datetime
 
-
 class ConfigurationManager:
     def __init__(self):
         # get path to this script
