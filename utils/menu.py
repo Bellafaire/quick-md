@@ -10,6 +10,7 @@ from textual.events import Key
 
 from utils.new_page_menu import NewPageMenu
 from utils.new_image_menu import NewImageMenu
+from utils.new_video_menu import NewVideoMenu
 
 class Menu:
     def __init__(self, configuration_manager):
@@ -18,7 +19,7 @@ class Menu:
         self.options = [
             "New Page", 
             "Add Image", 
-            #"Add Video",
+            "Add Video",
             #"Search Images",
             #"Search Videos",
             #"Search Markdown",
@@ -110,10 +111,8 @@ class MenuApp(App):
             self.push_screen(NewPageMenu(self.menu_instance, self.configuration_manager))
         elif option == "Add Image":
             self.push_screen(NewImageMenu(self.menu_instance, self.configuration_manager))
-            pass
         elif option == "Add Video":
-            # TODO: Implement add video
-            pass
+            self.push_screen(NewVideoMenu(self.menu_instance, self.configuration_manager))
         elif option == "Search Images":
             # TODO: Implement search images
             pass
