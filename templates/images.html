@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Images - Quick-md Notebook{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Images</h2>
+    <a href="/upload_image" class="btn">Upload New Image</a>
+</div>
+
+{% if images %}
+<div class="grid">
+    {% for image in images %}
+    <div class="media-item">
+        <img src="/media/{{ image }}" alt="{{ image }}">
+        <p style="font-weight: 600; margin-bottom: 0.5rem;">{{ image.split('/')[-1] }}</p>
+        <div class="code-display">![alt text]({{ image }})</div>
+        <button onclick="copyToClipboard('![alt text]({{ image }})')" class="btn" style="margin-top: 0.5rem; width: 100%;">Copy Markdown</button>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <p>No images yet. <a href="/upload_image">Upload your first image!</a></p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+    });
+}
+{% endblock %}

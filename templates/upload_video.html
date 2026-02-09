@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Video - Quick-md Notebook{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Upload Video</h2>
+    
+    <div id="message"></div>
+    
+    <form onsubmit="uploadVideo(event)">
+        <label for="title">Video Title:</label>
+        <input type="text" id="title" name="title" placeholder="Enter video title" required>
+        
+        <label for="file">Select Video:</label>
+        <input type="file" id="file" name="file" accept="video/*" required>
+        
+        <label for="resolution">Resolution:</label>
+        <select id="resolution" name="resolution">
+            <option value="480">480p</option>
+            <option value="720" selected>720p</option>
+            <option value="1080">1080p</option>
+        </select>
+        
+        <label for="compression">Compression Level:</label>
+        <select id="compression" name="compression">
+            <option value="fast">Low (Faster)</option>
+            <option value="medium" selected>Medium</option>
+            <option value="slow">High (Slower)</option>
+        </select>
+        
+        <div id="preview-container" style="margin-bottom: 1rem;"></div>
+        
+        <p style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;">
+            <strong>Note:</strong> Video processing may take some time depending on file size and compression settings.
+        </p>
+        
+        <button type="submit" class="btn">Upload & Process Video</button>
+        <a href="/videos" class="btn btn-secondary" style="margin-left: 0.5rem;">Cancel</a>
+    </form>
+</div>
+
+<div id="result-card" class="card" style="display: none;">
+    <h3>Upload Successful!</h3>
+    <div id="result-preview"></div>
+    <div class="code-display" id="video-tag"></div>
+    <button onclick="copyToClipboard()" class="btn" style="margin-top: 1rem;">Copy HTML to Clipboard</button>
+    <a href="/upload_video" class="btn btn-secondary" style="margin-left: 0.5rem; margin-top: 1rem;">Upload Another</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+let videoTagText = '';
+
+document.getElementById('file').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const preview = document.getElementById('preview-container');
+            preview.innerHTML = '<video src="' + event.target.result + '" controls style="max-width: 100%; max-height: 300px; border-radius: 4px;"></video>';
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+function showMessage(text, isError = false) {
+    const messageDiv = document.getElementById('message');
+    messageDiv.className = 'message ' + (isError ? 'error' : 'success');
+    messageDiv.textContent = text;
+}
+
+function uploadVideo(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Processing... This may take a while';
+    
+    fetch('/upload_video', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload & Process Video';
+        
+        if (data.success) {
+            videoTagText = data.video_tag;
+            document.getElementById('result-preview').innerHTML = 
+                '<video controls style="max-width: 100%; max-height: 300px; border-radius: 4px; margin-bottom: 1rem;"><source src="/media/' + data.relative_path + '" type="video/mp4"></video>';
+            document.getElementById('video-tag').textContent = data.video_tag;
+            document.getElementById('result-card').style.display = 'block';
+            event.target.reset();
+            document.getElementById('preview-container').innerHTML = '';
+            showMessage(data.message);
+        } else {
+            showMessage(data.message, true);
+        }
+    })
+    .catch(error => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload & Process Video';
+        showMessage('Error uploading video', true);
+    });
+}
+
+function copyToClipboard() {
+    navigator.clipboard.writeText(videoTagText).then(() => {
+        alert('Video HTML tag copied to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+    });
+}
+{% endblock %}

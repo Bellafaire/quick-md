@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Videos - Quick-md Notebook{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Videos</h2>
+    <a href="/upload_video" class="btn">Upload New Video</a>
+</div>
+
+{% if videos %}
+<div class="grid">
+    {% for video in videos %}
+    <div class="media-item">
+        <video width="100%" controls>
+            <source src="/media/{{ video }}" type="video/mp4">
+        </video>
+        <p style="font-weight: 600; margin-bottom: 0.5rem;">{{ video.split('/')[-1] }}</p>
+        <div class="code-display" style="word-break: break-all;">&lt;video width="640" loop autoplay controls&gt;&lt;source src="{{ video }}" type="video/mp4"&gt;&lt;/video&gt;</div>
+        <button onclick="copyToClipboard('<video width=&quot;640&quot; loop autoplay controls><source src=&quot;{{ video }}&quot; type=&quot;video/mp4&quot;></video>')" class="btn" style="margin-top: 0.5rem; width: 100%;">Copy HTML</button>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <p>No videos yet. <a href="/upload_video">Upload your first video!</a></p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+    });
+}
+{% endblock %}

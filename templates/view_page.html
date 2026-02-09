@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}{{ filename }} - Quick-md Notebook{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>{{ filename }}</h2>
+        <div>
+            <button onclick="toggleView()" class="btn btn-secondary" id="toggle-btn" style="margin-right: 0.5rem;">Show Raw</button>
+            <a href="/edit/{{ filename }}" class="btn">Edit</a>
+            <a href="/" class="btn btn-secondary" style="margin-left: 0.5rem;">Back to Home</a>
+        </div>
+    </div>
+    
+    <div id="rendered-view" class="markdown-content">
+        {{ html_content|safe }}
+    </div>
+    
+    <div id="raw-view" class="code-display" style="display: none;">
+        <pre>{{ content }}</pre>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+let showingRaw = false;
+
+function toggleView() {
+    const renderedView = document.getElementById('rendered-view');
+    const rawView = document.getElementById('raw-view');
+    const toggleBtn = document.getElementById('toggle-btn');
+    
+    showingRaw = !showingRaw;
+    
+    if (showingRaw) {
+        renderedView.style.display = 'none';
+        rawView.style.display = 'block';
+        toggleBtn.textContent = 'Show Rendered';
+    } else {
+        renderedView.style.display = 'block';
+        rawView.style.display = 'none';
+        toggleBtn.textContent = 'Show Raw';
+    }
+}
+{% endblock %}

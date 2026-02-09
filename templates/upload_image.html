@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Image - Quick-md Notebook{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Upload Image</h2>
+    
+    <div id="message"></div>
+    
+    <form onsubmit="uploadImage(event)">
+        <label for="title">Image Title:</label>
+        <input type="text" id="title" name="title" placeholder="Enter image title" required>
+        
+        <label for="file">Select Image:</label>
+        <input type="file" id="file" name="file" accept="image/*" required>
+        
+        <div id="preview-container" style="margin-bottom: 1rem;"></div>
+        
+        <button type="submit" class="btn">Upload Image</button>
+        <a href="/images" class="btn btn-secondary" style="margin-left: 0.5rem;">Cancel</a>
+    </form>
+</div>
+
+<div id="result-card" class="card" style="display: none;">
+    <h3>Upload Successful!</h3>
+    <div id="result-preview"></div>
+    <div class="code-display" id="markdown-link"></div>
+    <button onclick="copyToClipboard()" class="btn" style="margin-top: 1rem;">Copy Markdown to Clipboard</button>
+    <a href="/upload_image" class="btn btn-secondary" style="margin-left: 0.5rem; margin-top: 1rem;">Upload Another</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+let markdownLinkText = '';
+
+document.getElementById('file').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const preview = document.getElementById('preview-container');
+            preview.innerHTML = '<img src="' + event.target.result + '" style="max-width: 100%; max-height: 300px; border-radius: 4px;">';
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+function showMessage(text, isError = false) {
+    const messageDiv = document.getElementById('message');
+    messageDiv.className = 'message ' + (isError ? 'error' : 'success');
+    messageDiv.textContent = text;
+}
+
+function uploadImage(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Uploading...';
+    
+    fetch('/upload_image', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload Image';
+        
+        if (data.success) {
+            markdownLinkText = data.markdown_link;
+            document.getElementById('result-preview').innerHTML = 
+                '<img src="/media/' + data.relative_path + '" style="max-width: 100%; max-height: 300px; border-radius: 4px; margin-bottom: 1rem;">';
+            document.getElementById('markdown-link').textContent = data.markdown_link;
+            document.getElementById('result-card').style.display = 'block';
+            event.target.reset();
+            document.getElementById('preview-container').innerHTML = '';
+            showMessage(data.message);
+        } else {
+            showMessage(data.message, true);
+        }
+    })
+    .catch(error => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload Image';
+        showMessage('Error uploading image', true);
+    });
+}
+
+function copyToClipboard() {
+    navigator.clipboard.writeText(markdownLinkText).then(() => {
+        alert('Markdown link copied to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+    });
+}
+{% endblock %}

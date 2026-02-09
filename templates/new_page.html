@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}New Page - Quick-md Notebook{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Create New Page</h2>
+    
+    <div id="message"></div>
+    
+    <form onsubmit="createPage(event)">
+        <label for="title">Page Title:</label>
+        <input type="text" id="title" name="title" placeholder="Enter page title" required>
+        
+        <p style="color: #666; font-size: 0.9rem; margin-top: -0.5rem; margin-bottom: 1rem;">
+            Filename will be: <span id="filename-preview">YYYY_MM_DD_title.md</span>
+        </p>
+        
+        <button type="submit" class="btn">Create Page</button>
+        <a href="/" class="btn btn-secondary" style="margin-left: 0.5rem;">Cancel</a>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+document.getElementById('title').addEventListener('input', function(e) {
+    const title = e.target.value.toLowerCase().replace(/\s+/g, '_');
+    const date = new Date();
+    const dateStr = `${date.getFullYear()}_${String(date.getMonth()+1).padStart(2,'0')}_${String(date.getDate()).padStart(2,'0')}`;
+    const filename = title ? `${dateStr}_${title}.md` : 'YYYY_MM_DD_title.md';
+    document.getElementById('filename-preview').textContent = filename;
+});
+
+function showMessage(text, isError = false) {
+    const messageDiv = document.getElementById('message');
+    messageDiv.className = 'message ' + (isError ? 'error' : 'success');
+    messageDiv.textContent = text;
+}
+
+function createPage(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    
+    fetch('/new_page', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('Page created successfully! Redirecting...');
+            setTimeout(() => {
+                window.location.href = '/edit/' + data.filename;
+            }, 1000);
+        } else {
+            showMessage(data.message, true);
+        }
+    })
+    .catch(error => {
+        showMessage('Error creating page', true);
+    });
+}
+{% endblock %}

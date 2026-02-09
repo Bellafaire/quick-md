@@ -48,6 +48,15 @@ class MenuApp(App):
         height: auto;
     }
     
+    #web_server_status {
+        dock: bottom;
+        height: 1;
+        text-align: right;
+        color: $success;
+        text-style: italic;
+        padding-right: 2;
+    }
+    
     Button {
         width: 100%;
         margin: 0;
@@ -78,6 +87,7 @@ class MenuApp(App):
         self.configuration_manager = configuration_manager
         self.menu_instance = menu_instance
         self.options = menu_instance.options
+        self.web_server = None
     
     def compose(self) -> ComposeResult:
         with Center():
@@ -89,6 +99,18 @@ class MenuApp(App):
                         button = Button(f"{idx}. {option}", id=f"btn_{idx}")
                         button.can_focus = False
                         yield button
+        yield Static("", id="web_server_status")
+    
+    def on_mount(self) -> None:
+        """Start web server when app mounts"""
+        try:
+            from web_server import WebServer
+            self.web_server = WebServer(self.configuration_manager)
+            self.web_server.start()
+            address = self.web_server.get_address()
+            self.query_one("#web_server_status", Static).update(f"Web server: {address}")
+        except Exception as e:
+            self.query_one("#web_server_status", Static).update(f"Web server: Error starting")
     
     def on_button_pressed(self, event: Button.Pressed) -> None:
         # Only handle buttons from the main menu (they start with "btn_")

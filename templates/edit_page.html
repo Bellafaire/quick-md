@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ filename }} - Quick-md Notebook{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>Edit: {{ filename }}</h2>
+        <div>
+            <button onclick="togglePreview()" class="btn btn-secondary" id="preview-toggle" style="margin-right: 0.5rem;">Hide Preview</button>
+            <a href="/page/{{ filename }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </div>
+    
+    <div id="message"></div>
+    
+    <div id="split-view" class="split-view">
+        <div id="editor-panel">
+            <h3>Editor</h3>
+            <textarea id="content">{{ content }}</textarea>
+            <button onclick="saveContent()" class="btn">Save Changes</button>
+            <button onclick="updatePreview()" class="btn btn-secondary" style="margin-left: 0.5rem;">Update Preview</button>
+        </div>
+        
+        <div id="preview-panel">
+            <h3>Preview</h3>
+            <div id="preview" class="markdown-content" style="border: 1px solid #ddd; border-radius: 4px; padding: 1rem; min-height: 400px; background: white;">
+                Loading preview...
+            </div>
+        </div>
+    </div>
+    
+    <div id="full-editor" style="display: none;">
+        <h3>Editor</h3>
+        <textarea id="content-full">{{ content }}</textarea>
+        <button onclick="saveContent()" class="btn">Save Changes</button>
+        <button onclick="updatePreview()" class="btn btn-secondary" style="margin-left: 0.5rem;">Update Preview</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+let previewVisible = true;
+
+function showMessage(text, isError = false) {
+    const messageDiv = document.getElementById('message');
+    messageDiv.className = 'message ' + (isError ? 'error' : 'success');
+    messageDiv.textContent = text;
+    setTimeout(() => {
+        messageDiv.className = '';
+        messageDiv.textContent = '';
+    }, 3000);
+}
+
+function togglePreview() {
+    const splitView = document.getElementById('split-view');
+    const fullEditor = document.getElementById('full-editor');
+    const toggleBtn = document.getElementById('preview-toggle');
+    const content = document.getElementById('content');
+    const contentFull = document.getElementById('content-full');
+    
+    previewVisible = !previewVisible;
+    
+    if (previewVisible) {
+        // Show split view
+        contentFull.value = content.value; // Sync content back
+        splitView.style.display = 'grid';
+        fullEditor.style.display = 'none';
+        toggleBtn.textContent = 'Hide Preview';
+        updatePreview();
+    } else {
+        // Show full editor
+        contentFull.value = content.value; // Sync content
+        splitView.style.display = 'none';
+        fullEditor.style.display = 'block';
+        toggleBtn.textContent = 'Show Preview';
+    }
+}
+
+function updatePreview() {
+    if (!previewVisible) return;
+    
+    const content = document.getElementById('content').value;
+    fetch('/api/markdown_preview', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content: content })
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('preview').innerHTML = data.html;
+        // Re-render MathJax after content update
+        if (window.MathJax) {
+            MathJax.typesetPromise([document.getElementById('preview')]).catch((err) => console.log(err));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.getElementById('preview').innerHTML = '<p style="color: red;">Error generating preview</p>';
+    });
+}
+
+function saveContent() {
+    // Get content from whichever editor is visible
+    const content = previewVisible ? 
+        document.getElementById('content').value : 
+        document.getElementById('content-full').value;
+    
+    const formData = new FormData();
+    formData.append('content', content);
+    
+    fetch('/save/{{ filename }}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(data.message);
+            if (previewVisible) {
+                updatePreview();
+            }
+        } else {
+            showMessage(data.message, true);
+        }
+    })
+    .catch(error => {
+        showMessage('Error saving file', true);
+    });
+}
+
+// Auto-update preview on load
+updatePreview();
+
+// Optional: Auto-update preview while typing (debounced)
+let previewTimeout;
+document.getElementById('content').addEventListener('input', function() {
+    clearTimeout(previewTimeout);
+    previewTimeout = setTimeout(updatePreview, 1000);
+});
+{% endblock %}

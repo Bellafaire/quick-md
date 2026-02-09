@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Quick-md Notebook{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Markdown Pages</h2>
+    <p style="margin-bottom: 1rem;">Manage your markdown notebook pages</p>
+    <a href="/new_page" class="btn">Create New Page</a>
+</div>
+
+<div class="card">
+    {% if markdown_files %}
+        <h3 style="margin-bottom: 1rem;">Your Pages</h3>
+        <ul style="list-style: none;">
+            {% for file in markdown_files %}
+            <li style="padding: 1rem; background: #f8f9fa; margin-bottom: 0.5rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                <span>{{ file }}</span>
+                <div>
+                    <a href="/page/{{ file }}" class="btn" style="margin-right: 0.5rem; padding: 0.5rem 1rem;">View</a>
+                    <a href="/edit/{{ file }}" class="btn btn-secondary" style="padding: 0.5rem 1rem;">Edit</a>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No markdown files yet. <a href="/new_page">Create your first page!</a></p>
+    {% endif %}
+</div>
+{% endblock %}
