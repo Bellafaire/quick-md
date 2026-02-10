@@ -2,17 +2,182 @@
 
 {% block title %}Edit {{ filename }} - Quick-md Notebook{% endblock %}
 
+{% block extra_css %}
+<style>
+    #media-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+    
+    #media-modal-content {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        max-width: 800px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    }
+    
+    .media-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        border-bottom: 2px solid #ddd;
+    }
+    
+    .media-tab {
+        padding: 0.6rem 1rem;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 0.95rem;
+        color: #666;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+    }
+    
+    .media-tab.active {
+        color: #3498db;
+        border-bottom-color: #3498db;
+        font-weight: 600;
+    }
+    
+    .media-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .media-item-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        transition: background 0.2s;
+    }
+    
+    .media-item-row:hover {
+        background: #f8f9fa;
+    }
+    
+    .media-preview {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 4px;
+        flex-shrink: 0;
+    }
+    
+    @media (max-width: 480px) {
+        #media-modal-content {
+            width: 95%;
+            padding: 1rem;
+        }
+        
+        .media-preview {
+            width: 50px;
+            height: 50px;
+        }
+        
+        .media-item-row {
+            padding: 0.5rem;
+            gap: 0.5rem;
+        }
+        
+        .media-filename {
+            font-size: 0.9rem;
+        }
+        
+        .media-path {
+            font-size: 0.75rem;
+        }
+    }
+    
+    .button-group {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    
+    .page-header h2 {
+        flex: 1;
+        min-width: 200px;
+    }
+    
+    @media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .page-header h2 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .button-group {
+            width: 100%;
+        }
+        
+        .button-group > * {
+            flex: 1;
+            min-width: fit-content;
+        }
+    }
+    
+    .media-info {
+        flex: 1;
+    }
+    
+    .media-filename {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+    
+    .media-path {
+        font-size: 0.85rem;
+        color: #666;
+        font-family: monospace;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <div class="page-header">
         <h2>Edit: {{ filename }}</h2>
-        <div>
-            <button onclick="togglePreview()" class="btn btn-secondary" id="preview-toggle" style="margin-right: 0.5rem;">Hide Preview</button>
+        <div class="button-group">
+            <button onclick="openMediaPicker()" class="btn">Insert Media</button>
+            <button onclick="togglePreview()" class="btn btn-secondary" id="preview-toggle">Hide Preview</button>
             <a href="/page/{{ filename }}" class="btn btn-secondary">Cancel</a>
         </div>
     </div>
     
     <div id="message"></div>
+    <div style="text-align: right; color: #666; font-size: 0.85rem; margin-bottom: 0.5rem;">
+        <span id="autosave-status">Auto-save enabled</span>
+    </div>
     
     <div id="split-view" class="split-view">
         <div id="editor-panel">
@@ -37,10 +202,36 @@
         <button onclick="updatePreview()" class="btn btn-secondary" style="margin-left: 0.5rem;">Update Preview</button>
     </div>
 </div>
+
+<!-- Media Picker Modal -->
+<div id="media-modal">
+    <div id="media-modal-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2>Insert Media</h2>
+            <button onclick="closeMediaPicker()" class="btn btn-secondary">Close</button>
+        </div>
+        
+        <div class="media-tabs">
+            <button class="media-tab active" onclick="switchMediaTab('images')">Images</button>
+            <button class="media-tab" onclick="switchMediaTab('videos')">Videos</button>
+        </div>
+        
+        <div id="images-tab" class="media-list">
+            <!-- Images will be loaded here -->
+        </div>
+        
+        <div id="videos-tab" class="media-list" style="display: none;">
+            <!-- Videos will be loaded here -->
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 let previewVisible = true;
+let mediaData = { images: [], videos: [] };
+let lastSavedContent = '';
+let autoSaveInterval = null;
 
 function showMessage(text, isError = false) {
     const messageDiv = document.getElementById('message');
@@ -62,20 +253,127 @@ function togglePreview() {
     previewVisible = !previewVisible;
     
     if (previewVisible) {
-        // Show split view
-        contentFull.value = content.value; // Sync content back
+        contentFull.value = content.value;
         splitView.style.display = 'grid';
         fullEditor.style.display = 'none';
         toggleBtn.textContent = 'Hide Preview';
         updatePreview();
     } else {
-        // Show full editor
-        contentFull.value = content.value; // Sync content
+        contentFull.value = content.value;
         splitView.style.display = 'none';
         fullEditor.style.display = 'block';
         toggleBtn.textContent = 'Show Preview';
     }
 }
+
+function openMediaPicker() {
+    document.getElementById('media-modal').style.display = 'flex';
+    loadMedia();
+}
+
+function closeMediaPicker() {
+    document.getElementById('media-modal').style.display = 'none';
+}
+
+function switchMediaTab(tab) {
+    // Update tab buttons
+    document.querySelectorAll('.media-tab').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Show/hide tab content
+    document.getElementById('images-tab').style.display = tab === 'images' ? 'flex' : 'none';
+    document.getElementById('videos-tab').style.display = tab === 'videos' ? 'flex' : 'none';
+}
+
+function loadMedia() {
+    // Load images
+    fetch('/api/media_list')
+        .then(response => response.json())
+        .then(data => {
+            mediaData = data;
+            renderMediaList('images', data.images);
+            renderMediaList('videos', data.videos);
+        })
+        .catch(error => {
+            console.error('Error loading media:', error);
+        });
+}
+
+function renderMediaList(type, items) {
+    const container = document.getElementById(`${type}-tab`);
+    
+    if (items.length === 0) {
+        container.innerHTML = '<p>No ' + type + ' found. <a href="/upload_' + (type === 'images' ? 'image' : 'video') + '">Upload one!</a></p>';
+        return;
+    }
+    
+    // Sort by most recent (reverse order)
+    const sortedItems = [...items].reverse();
+    
+    container.innerHTML = sortedItems.map(item => {
+        const filename = item.split('/').pop();
+        const isImage = type === 'images';
+        const preview = isImage 
+            ? `<img src="/media/${item}" class="media-preview" alt="${filename}">`
+            : `<video src="/media/${item}" class="media-preview"></video>`;
+        
+        return `
+            <div class="media-item-row">
+                ${preview}
+                <div class="media-info">
+                    <div class="media-filename">${filename}</div>
+                    <div class="media-path">${item}</div>
+                </div>
+                <button onclick="insertMedia('${item}', ${isImage})" class="btn">Insert</button>
+            </div>
+        `;
+    }).join('');
+}
+
+function insertMedia(path, isImage) {
+    const textarea = previewVisible ? 
+        document.getElementById('content') : 
+        document.getElementById('content-full');
+    
+    const cursorPos = textarea.selectionStart;
+    const textBefore = textarea.value.substring(0, cursorPos);
+    const textAfter = textarea.value.substring(cursorPos);
+    
+    let mediaText;
+    if (isImage) {
+        const alt = path.split('/').pop().replace(/\.[^/.]+$/, '');
+        mediaText = `![${alt}](${path})`;
+    } else {
+        mediaText = `<video width="640" loop autoplay controls><source src="${path}" type="video/mp4"></video>`;
+    }
+    
+    // Insert at cursor position
+    textarea.value = textBefore + mediaText + textAfter;
+    
+    // Move cursor after inserted text
+    const newCursorPos = cursorPos + mediaText.length;
+    textarea.setSelectionRange(newCursorPos, newCursorPos);
+    textarea.focus();
+    
+    // Update preview if visible
+    if (previewVisible) {
+        updatePreview();
+    }
+    
+    // Close modal
+    closeMediaPicker();
+    
+    showMessage('Media inserted at cursor position');
+}
+
+// Close modal when clicking outside
+document.getElementById('media-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeMediaPicker();
+    }
+});
 
 function updatePreview() {
     if (!previewVisible) return;
@@ -91,7 +389,6 @@ function updatePreview() {
     .then(response => response.json())
     .then(data => {
         document.getElementById('preview').innerHTML = data.html;
-        // Re-render MathJax after content update
         if (window.MathJax) {
             MathJax.typesetPromise([document.getElementById('preview')]).catch((err) => console.log(err));
         }
@@ -102,11 +399,15 @@ function updatePreview() {
     });
 }
 
-function saveContent() {
-    // Get content from whichever editor is visible
+function saveContent(isAutoSave = false) {
     const content = previewVisible ? 
         document.getElementById('content').value : 
         document.getElementById('content-full').value;
+    
+    // Skip auto-save if content hasn't changed
+    if (isAutoSave && content === lastSavedContent) {
+        return;
+    }
     
     const formData = new FormData();
     formData.append('content', content);
@@ -118,7 +419,25 @@ function saveContent() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showMessage(data.message);
+            lastSavedContent = content;
+            if (isAutoSave) {
+                // Update status indicator
+                const statusSpan = document.getElementById('autosave-status');
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                statusSpan.textContent = `✓ Auto-saved at ${timeStr}`;
+                statusSpan.style.color = '#27ae60';
+                setTimeout(() => {
+                    statusSpan.style.color = '#666';
+                }, 2000);
+            } else {
+                showMessage(data.message);
+                // Update status for manual save too
+                const statusSpan = document.getElementById('autosave-status');
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                statusSpan.textContent = `✓ Saved at ${timeStr}`;
+            }
             if (previewVisible) {
                 updatePreview();
             }
@@ -127,17 +446,70 @@ function saveContent() {
         }
     })
     .catch(error => {
-        showMessage('Error saving file', true);
+        if (!isAutoSave) {
+            showMessage('Error saving file', true);
+        }
     });
+}
+
+function startAutoSave() {
+    // Auto-save every 10 seconds
+    autoSaveInterval = setInterval(() => {
+        saveContent(true);
+    }, 10000);
+}
+
+function stopAutoSave() {
+    if (autoSaveInterval) {
+        clearInterval(autoSaveInterval);
+        autoSaveInterval = null;
+    }
 }
 
 // Auto-update preview on load
 updatePreview();
+
+// Initialize auto-save
+startAutoSave();
+
+// Store initial content
+const initialContent = document.getElementById('content').value;
+lastSavedContent = initialContent;
+
+// Auto-expand textarea function
+function autoExpandTextarea(textarea) {
+    // Reset height to auto to get the correct scrollHeight
+    textarea.style.height = 'auto';
+    // Set height to scrollHeight plus a bit of padding
+    textarea.style.height = Math.min(textarea.scrollHeight, window.innerHeight * 0.8) + 'px';
+}
+
+// Apply auto-expand to both textareas
+const contentTextarea = document.getElementById('content');
+const contentFullTextarea = document.getElementById('content-full');
+
+// Initial expansion
+autoExpandTextarea(contentTextarea);
+autoExpandTextarea(contentFullTextarea);
+
+// Auto-expand on input
+contentTextarea.addEventListener('input', function() {
+    autoExpandTextarea(this);
+});
+
+contentFullTextarea.addEventListener('input', function() {
+    autoExpandTextarea(this);
+});
 
 // Optional: Auto-update preview while typing (debounced)
 let previewTimeout;
 document.getElementById('content').addEventListener('input', function() {
     clearTimeout(previewTimeout);
     previewTimeout = setTimeout(updatePreview, 1000);
+});
+
+// Clean up on page unload
+window.addEventListener('beforeunload', function() {
+    stopAutoSave();
 });
 {% endblock %}

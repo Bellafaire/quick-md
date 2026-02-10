@@ -218,6 +218,12 @@ class WebServer:
             html = markdown.markdown(content, extensions=['extra'])
             html = self._fix_media_paths(html)
             return jsonify({'html': html})
+        
+        @self.app.route('/api/media_list')
+        def media_list():
+            images = self.config_manager.config.get('Images', [])
+            videos = self.config_manager.config.get('Videos', [])
+            return jsonify({'images': images, 'videos': videos})
     
     def start(self):
         """Start the web server in a background thread"""
