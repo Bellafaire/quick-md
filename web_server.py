@@ -29,8 +29,8 @@ class WebServer:
         
         @self.app.route('/')
         def index():
-            markdown_files = self.config_manager.config.get('Markdown', [])
-            return render_template('index.html', markdown_files=markdown_files)
+            from flask import redirect, url_for
+            return redirect(url_for('view_page', filename='main.md'))
         
         @self.app.route('/page/<path:filename>')
         def view_page(filename):

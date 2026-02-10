@@ -3,6 +3,9 @@
 {% block title %}Edit {{ filename }} - Quick-md Notebook{% endblock %}
 
 {% block extra_css %}
+<!-- CodeMirror CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/material-darker.min.css">
 <style>
     #media-modal {
         position: fixed;
@@ -146,6 +149,64 @@
         }
     }
     
+    /* CodeMirror customization */
+    .CodeMirror {
+        height: auto;
+        min-height: 300px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        font-family: 'Courier New', 'Monaco', monospace;
+    }
+    
+    /* Hide scrollbars */
+    .CodeMirror-scroll {
+        overflow: hidden !important;
+    }
+    
+    .CodeMirror-vscrollbar,
+    .CodeMirror-hscrollbar {
+        display: none !important;
+    }
+    
+    .vim-mode-indicator {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #2c3e50;
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        font-family: monospace;
+        z-index: 999;
+        font-size: 0.9rem;
+    }
+    
+    .vim-mode-indicator.normal {
+        background: #27ae60;
+    }
+    
+    .vim-mode-indicator.insert {
+        background: #3498db;
+    }
+    
+    .vim-mode-indicator.visual {
+        background: #e67e22;
+    }
+    
+    .vim-toggle {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .vim-toggle input[type="checkbox"] {
+        width: auto;
+        cursor: pointer;
+    }
+    
     .media-info {
         flex: 1;
     }
@@ -169,20 +230,25 @@
         <h2>Edit: {{ filename }}</h2>
         <div class="button-group">
             <button onclick="openMediaPicker()" class="btn">Insert Media</button>
-            <button onclick="togglePreview()" class="btn btn-secondary" id="preview-toggle">Hide Preview</button>
+            <button onclick="togglePreview()" class="btn btn-secondary" id="preview-toggle">Show Preview</button>
             <a href="/page/{{ filename }}" class="btn btn-secondary">Cancel</a>
         </div>
     </div>
     
     <div id="message"></div>
-    <div style="text-align: right; color: #666; font-size: 0.85rem; margin-bottom: 0.5rem;">
-        <span id="autosave-status">Auto-save enabled</span>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+        <div class="vim-toggle">
+            <input type="checkbox" id="vim-mode-toggle">
+            <label for="vim-mode-toggle" style="margin: 0; cursor: pointer;">Enable Vim Mode</label>
+        </div>
+        <span id="autosave-status" style="color: #666; font-size: 0.85rem;">Auto-save enabled</span>
     </div>
     
-    <div id="split-view" class="split-view">
+    <div id="split-view" class="split-view" style="display: none;">
         <div id="editor-panel">
             <h3>Editor</h3>
-            <textarea id="content">{{ content }}</textarea>
+            <textarea id="content" style="display: none;">{{ content }}</textarea>
+            <div id="codemirror-editor"></div>
             <button onclick="saveContent()" class="btn">Save Changes</button>
             <button onclick="updatePreview()" class="btn btn-secondary" style="margin-left: 0.5rem;">Update Preview</button>
         </div>
@@ -195,12 +261,18 @@
         </div>
     </div>
     
-    <div id="full-editor" style="display: none;">
+    <div id="full-editor">
         <h3>Editor</h3>
-        <textarea id="content-full">{{ content }}</textarea>
+        <textarea id="content-full" style="display: none;">{{ content }}</textarea>
+        <div id="codemirror-editor-full"></div>
         <button onclick="saveContent()" class="btn">Save Changes</button>
         <button onclick="updatePreview()" class="btn btn-secondary" style="margin-left: 0.5rem;">Update Preview</button>
     </div>
+</div>
+
+<!-- Vim Mode Indicator -->
+<div id="vim-indicator" class="vim-mode-indicator" style="display: none;">
+    NORMAL
 </div>
 
 <!-- Media Picker Modal -->
@@ -227,11 +299,116 @@
 </div>
 {% endblock %}
 
+{% block extra_scripts %}
+<!-- CodeMirror Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/markdown/markdown.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/keymap/vim.min.js"></script>
+{% endblock %}
+
 {% block scripts %}
-let previewVisible = true;
+let previewVisible = false;
 let mediaData = { images: [], videos: [] };
 let lastSavedContent = '';
 let autoSaveInterval = null;
+let codeMirrorEditor = null;
+let codeMirrorEditorFull = null;
+let vimModeEnabled = false;
+
+// Initialize CodeMirror editors
+function initCodeMirror() {
+    const textarea = document.getElementById('content');
+    const textareaFull = document.getElementById('content-full');
+    
+    // Main editor
+    codeMirrorEditor = CodeMirror(document.getElementById('codemirror-editor'), {
+        value: textarea.value,
+        mode: 'markdown',
+        lineNumbers: true,
+        lineWrapping: true,
+        theme: 'material-darker',
+        tabSize: 2,
+        indentUnit: 2,
+        viewportMargin: Infinity,
+        extraKeys: {
+            "Tab": function(cm) {
+                cm.replaceSelection("  ");
+            }
+        }
+    });
+    
+    // Full editor
+    codeMirrorEditorFull = CodeMirror(document.getElementById('codemirror-editor-full'), {
+        value: textareaFull.value,
+        mode: 'markdown',
+        lineNumbers: true,
+        lineWrapping: true,
+        theme: 'material-darker',
+        tabSize: 2,
+        indentUnit: 2,
+        viewportMargin: Infinity,
+        extraKeys: {
+            "Tab": function(cm) {
+                cm.replaceSelection("  ");
+            }
+        }
+    });
+    
+    // Sync changes for auto-save
+    codeMirrorEditor.on('change', function() {
+        clearTimeout(previewTimeout);
+        previewTimeout = setTimeout(updatePreview, 1000);
+    });
+    
+    codeMirrorEditorFull.on('change', function() {
+        // Sync content
+        codeMirrorEditor.setValue(codeMirrorEditorFull.getValue());
+    });
+    
+    // Vim mode change handler
+    CodeMirror.on(codeMirrorEditor, 'vim-mode-change', updateVimIndicator);
+    CodeMirror.on(codeMirrorEditorFull, 'vim-mode-change', updateVimIndicator);
+}
+
+function toggleVimMode() {
+    vimModeEnabled = !vimModeEnabled;
+    const keymap = vimModeEnabled ? 'vim' : 'default';
+    const indicator = document.getElementById('vim-indicator');
+    
+    codeMirrorEditor.setOption('keyMap', keymap);
+    codeMirrorEditorFull.setOption('keyMap', keymap);
+    
+    if (vimModeEnabled) {
+        indicator.style.display = 'block';
+        indicator.textContent = 'NORMAL';
+        indicator.className = 'vim-mode-indicator normal';
+    } else {
+        indicator.style.display = 'none';
+    }
+    
+    // Save preference to localStorage
+    localStorage.setItem('vimModeEnabled', vimModeEnabled);
+}
+
+function updateVimIndicator(modeObj) {
+    if (!vimModeEnabled) return;
+    
+    const indicator = document.getElementById('vim-indicator');
+    const mode = modeObj.mode;
+    
+    indicator.className = 'vim-mode-indicator';
+    
+    if (mode === 'insert') {
+        indicator.textContent = 'INSERT';
+        indicator.classList.add('insert');
+    } else if (mode === 'visual') {
+        indicator.textContent = 'VISUAL';
+        indicator.classList.add('visual');
+    } else {
+        indicator.textContent = 'NORMAL';
+        indicator.classList.add('normal');
+    }
+}
 
 function showMessage(text, isError = false) {
     const messageDiv = document.getElementById('message');
@@ -247,22 +424,24 @@ function togglePreview() {
     const splitView = document.getElementById('split-view');
     const fullEditor = document.getElementById('full-editor');
     const toggleBtn = document.getElementById('preview-toggle');
-    const content = document.getElementById('content');
-    const contentFull = document.getElementById('content-full');
     
     previewVisible = !previewVisible;
     
     if (previewVisible) {
-        contentFull.value = content.value;
+        // Sync to split view
+        codeMirrorEditor.setValue(codeMirrorEditorFull.getValue());
         splitView.style.display = 'grid';
         fullEditor.style.display = 'none';
         toggleBtn.textContent = 'Hide Preview';
+        codeMirrorEditor.refresh();
         updatePreview();
     } else {
-        contentFull.value = content.value;
+        // Sync to full view
+        codeMirrorEditorFull.setValue(codeMirrorEditor.getValue());
         splitView.style.display = 'none';
         fullEditor.style.display = 'block';
         toggleBtn.textContent = 'Show Preview';
+        codeMirrorEditorFull.refresh();
     }
 }
 
@@ -312,7 +491,7 @@ function renderMediaList(type, items) {
     // Sort by most recent (reverse order)
     const sortedItems = [...items].reverse();
     
-    container.innerHTML = sortedItems.map(item => {
+    container.innerHTML = sortedItems.map((item, index) => {
         const filename = item.split('/').pop();
         const isImage = type === 'images';
         const preview = isImage 
@@ -326,20 +505,23 @@ function renderMediaList(type, items) {
                     <div class="media-filename">${filename}</div>
                     <div class="media-path">${item}</div>
                 </div>
-                <button onclick="insertMedia('${item}', ${isImage})" class="btn">Insert</button>
+                <button class="btn media-insert-btn" data-path="${item}" data-is-image="${isImage}">Insert</button>
             </div>
         `;
     }).join('');
+    
+    // Add event listeners to insert buttons
+    container.querySelectorAll('.media-insert-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const path = this.getAttribute('data-path');
+            const isImage = this.getAttribute('data-is-image') === 'true';
+            insertMedia(path, isImage);
+        });
+    });
 }
 
 function insertMedia(path, isImage) {
-    const textarea = previewVisible ? 
-        document.getElementById('content') : 
-        document.getElementById('content-full');
-    
-    const cursorPos = textarea.selectionStart;
-    const textBefore = textarea.value.substring(0, cursorPos);
-    const textAfter = textarea.value.substring(cursorPos);
+    const editor = previewVisible ? codeMirrorEditor : codeMirrorEditorFull;
     
     let mediaText;
     if (isImage) {
@@ -350,12 +532,13 @@ function insertMedia(path, isImage) {
     }
     
     // Insert at cursor position
-    textarea.value = textBefore + mediaText + textAfter;
+    const cursor = editor.getCursor();
+    editor.replaceRange(mediaText, cursor);
     
     // Move cursor after inserted text
-    const newCursorPos = cursorPos + mediaText.length;
-    textarea.setSelectionRange(newCursorPos, newCursorPos);
-    textarea.focus();
+    const newCursor = editor.findPosH(cursor, mediaText.length, 'char');
+    editor.setCursor(newCursor);
+    editor.focus();
     
     // Update preview if visible
     if (previewVisible) {
@@ -378,7 +561,7 @@ document.getElementById('media-modal').addEventListener('click', function(e) {
 function updatePreview() {
     if (!previewVisible) return;
     
-    const content = document.getElementById('content').value;
+    const content = codeMirrorEditor.getValue();
     fetch('/api/markdown_preview', {
         method: 'POST',
         headers: {
@@ -401,8 +584,8 @@ function updatePreview() {
 
 function saveContent(isAutoSave = false) {
     const content = previewVisible ? 
-        document.getElementById('content').value : 
-        document.getElementById('content-full').value;
+        codeMirrorEditor.getValue() : 
+        codeMirrorEditorFull.getValue();
     
     // Skip auto-save if content hasn't changed
     if (isAutoSave && content === lastSavedContent) {
@@ -466,6 +649,19 @@ function stopAutoSave() {
     }
 }
 
+// Initialize CodeMirror
+initCodeMirror();
+
+// Add event listener for Vim mode toggle
+document.getElementById('vim-mode-toggle').addEventListener('change', toggleVimMode);
+
+// Restore Vim mode preference
+const savedVimMode = localStorage.getItem('vimModeEnabled') === 'true';
+if (savedVimMode) {
+    document.getElementById('vim-mode-toggle').checked = true;
+    toggleVimMode();
+}
+
 // Auto-update preview on load
 updatePreview();
 
@@ -473,40 +669,10 @@ updatePreview();
 startAutoSave();
 
 // Store initial content
-const initialContent = document.getElementById('content').value;
-lastSavedContent = initialContent;
-
-// Auto-expand textarea function
-function autoExpandTextarea(textarea) {
-    // Reset height to auto to get the correct scrollHeight
-    textarea.style.height = 'auto';
-    // Set height to scrollHeight plus a bit of padding
-    textarea.style.height = Math.min(textarea.scrollHeight, window.innerHeight * 0.8) + 'px';
-}
-
-// Apply auto-expand to both textareas
-const contentTextarea = document.getElementById('content');
-const contentFullTextarea = document.getElementById('content-full');
-
-// Initial expansion
-autoExpandTextarea(contentTextarea);
-autoExpandTextarea(contentFullTextarea);
-
-// Auto-expand on input
-contentTextarea.addEventListener('input', function() {
-    autoExpandTextarea(this);
-});
-
-contentFullTextarea.addEventListener('input', function() {
-    autoExpandTextarea(this);
-});
+lastSavedContent = codeMirrorEditor.getValue();
 
 // Optional: Auto-update preview while typing (debounced)
 let previewTimeout;
-document.getElementById('content').addEventListener('input', function() {
-    clearTimeout(previewTimeout);
-    previewTimeout = setTimeout(updatePreview, 1000);
-});
 
 // Clean up on page unload
 window.addEventListener('beforeunload', function() {
