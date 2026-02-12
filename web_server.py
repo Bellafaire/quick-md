@@ -36,17 +36,32 @@ class WebServer:
         html_content = re.sub(r'<img alt="([^"]*)" src="([^"]+)"', lambda m: f'<img alt="{m.group(1)}" src="/media/{m.group(2)}"' if not m.group(2).startswith(('/media/', 'http')) else m.group(0), html_content)
         return html_content
     
+    def _extract_title_from_markdown(self, content):
+        """Extract the first H1 title from markdown content"""
+        lines = content.split('\n')
+        for line in lines:
+            line = line.strip()
+            if line.startswith('# '):
+                return line[2:].strip()
+        return None
+    
     def _setup_routes(self):
         """Setup all Flask routes"""
         
         @self.app.context_processor
         def inject_password_protected():
-            return {'password_protected': self.password is not None}
+            notebook_title = self.config_manager.config.get('notebook_title', 'Quick-md Notebook')
+            return {
+                'password_protected': self.password is not None,
+                'notebook_title': notebook_title
+            }
         
         @self.app.route('/login', methods=['GET', 'POST'])
         def login():
             if not self.password:
                 return redirect(url_for('index'))
+            
+            notebook_title = self.config_manager.config.get('notebook_title', 'Quick-md Notebook')
             
             if request.method == 'POST':
                 password = request.form.get('password', '')
@@ -54,9 +69,9 @@ class WebServer:
                     session['authenticated'] = True
                     return redirect(url_for('index'))
                 else:
-                    return render_template('login.html', error='Invalid password')
+                    return render_template('login.html', error='Invalid password', notebook_title=notebook_title)
             
-            return render_template('login.html')
+            return render_template('login.html', notebook_title=notebook_title)
         
         @self.app.route('/logout')
         def logout():
@@ -83,7 +98,15 @@ class WebServer:
             
             html_content = markdown.markdown(content, extensions=['extra'])
             html_content = self._fix_media_paths(html_content)
-            return render_template('view_page.html', filename=filename, content=content, html_content=html_content)
+            
+            # Extract page title
+            page_title = self._extract_title_from_markdown(content) or filename
+            
+            return render_template('view_page.html', 
+                                   filename=filename, 
+                                   content=content, 
+                                   html_content=html_content,
+                                   page_title=page_title)
         
         @self.app.route('/edit/<path:filename>')
         @self._check_password
@@ -97,7 +120,10 @@ class WebServer:
             with open(filepath, 'r') as f:
                 content = f.read()
             
-            return render_template('edit_page.html', filename=filename, content=content)
+            # Extract page title
+            page_title = self._extract_title_from_markdown(content) or filename
+            
+            return render_template('edit_page.html', filename=filename, content=content, page_title=page_title)
         
         @self.app.route('/save/<path:filename>', methods=['POST'])
         @self._check_password
@@ -134,7 +160,7 @@ class WebServer:
                 with open(self.config_manager.config['local']['main_md'], 'a') as main_file:
                     main_file.write(f"- [{title_string}]({filename})\n")
                 
-                self.config_manager.add_markdown_to_config(filename)
+                self.config_manager.add_markdown_to_config(filename, original_title=title)
                 
                 return jsonify({'success': True, 'filename': filename})
             
@@ -176,7 +202,10 @@ class WebServer:
                 dest_path = os.path.join(dest_directory, filename)
                 file.save(dest_path)
                 
-                relative_path = f"images/{filename}"
+                # Auto-detect relative path
+                md_path = self.config_manager.config['local']['md_path']
+                relative_dir = os.path.relpath(dest_directory, md_path)
+                relative_path = f"{relative_dir}/{filename}"
                 self.config_manager.add_image_to_config(relative_path)
                 
                 markdown_link = image_handler.create_markdown_image_link(title, relative_path)
@@ -231,7 +260,10 @@ class WebServer:
                 if not success:
                     return jsonify({'success': False, 'message': process_msg})
                 
-                relative_path = f"videos/{filename}"
+                # Auto-detect relative path
+                md_path = self.config_manager.config['local']['md_path']
+                relative_dir = os.path.relpath(dest_directory, md_path)
+                relative_path = f"{relative_dir}/{filename}"
                 self.config_manager.add_video_to_config(relative_path)
                 
                 video_tag = video_handler.create_video_html_tag(relative_path, width="640")

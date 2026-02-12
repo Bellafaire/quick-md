@@ -78,12 +78,12 @@ This document outlines the development principles and requirements followed duri
 #### Media Processing
 - **Images** - Copied from screenshots directory
 - **Videos** - Processed with ffmpeg (resolution, compression)
-- **Relative paths** - Stored as `images/filename` or `videos/filename`
+- **Relative paths** - Auto-detected based on configured directory structure
 - **Config tracking** - All media added to `.qmd_conf`
 
 #### Markdown Generation
-- **Images** - `![alt text](images/filename.png)`
-- **Videos** - `<video width="640" loop autoplay controls><source src="videos/filename.webm"></video>`
+- **Images** - `![alt text](relative/path/filename.png)` (auto-detected path)
+- **Videos** - `<video width="640" loop autoplay controls><source src="relative/path/filename.webm"></video>`
 - **Clipboard support** - Markdown/HTML copied to clipboard (TUI)
 
 ### 6. Technology Stack

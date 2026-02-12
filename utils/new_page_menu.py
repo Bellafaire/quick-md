@@ -118,7 +118,7 @@ class NewPageMenu(Screen):
         with open(self.configuration_manager.config['local']['main_md'], 'a') as main_file:
             main_file.write(f"- [{title_string}]({filename})\n")
 
-        # Save markdown file to config
-        self.configuration_manager.add_markdown_to_config(filename)
+        # Save markdown file to config with original title
+        self.configuration_manager.add_markdown_to_config(filename, original_title=title)
 
 

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ filename }} - Quick-md Notebook{% endblock %}
+{% block title %}{{ page_title }} - {{ notebook_title }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -50,7 +50,7 @@
 {% block content %}
 <div class="card">
     <div class="page-header">
-        <h2>{{ filename }}</h2>
+        <h2>{{ page_title }}</h2>
         <div class="button-group">
             <button onclick="toggleView()" class="btn btn-secondary" id="toggle-btn">Show Raw</button>
             <a href="/edit/{{ filename }}" class="btn">Edit</a>

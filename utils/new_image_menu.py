@@ -129,8 +129,7 @@ class NewImageMenu(Screen):
         success, message, markdown_link = image_handler.add_image(
             config_manager=self.configuration_manager,
             filename=new_filename,
-            alt_text=title_input,
-            relative_images_dir="images"
+            alt_text=title_input
         )
         
 

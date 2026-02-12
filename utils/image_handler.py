@@ -35,7 +35,7 @@ def copy_markdown_link_to_clipboard(markdown_link):
         return False
 
 
-def add_image(config_manager, filename, alt_text, relative_images_dir="images"):
+def add_image(config_manager, filename, alt_text, relative_images_dir=None):
     """
     Add an image from source directory to destination directory and generate markdown link
     
@@ -43,7 +43,7 @@ def add_image(config_manager, filename, alt_text, relative_images_dir="images"):
     - config_manager: ConfigurationManager instance
     - filename: Name for the destination file (including extension)
     - alt_text: Alt text for the markdown image
-    - relative_images_dir: Relative path prefix for markdown link (e.g., "images")
+    - relative_images_dir: Relative path prefix for markdown link (auto-detected if None)
     
     Returns:
     - tuple: (success, message, markdown_link)
@@ -62,6 +62,11 @@ def add_image(config_manager, filename, alt_text, relative_images_dir="images"):
         copy_image_to_destination(source_path, dest_path)
     except Exception as e:
         return (False, f"Failed to copy image: {str(e)}", None)
+    
+    # Auto-detect relative directory if not specified
+    if relative_images_dir is None:
+        md_path = config_manager.config['local']['md_path']
+        relative_images_dir = os.path.relpath(dest_directory, md_path)
     
     # Create markdown link and relative path
     relative_path = f"{relative_images_dir}/{filename}"

@@ -9,14 +9,15 @@ class ConfigurationManager:
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
         self.config_path = os.path.abspath(os.path.join(self.script_dir, '../../.qmd_conf'))
 
-        self.config = self.load_config()
+        self.config_raw = self.load_config()  # Keep original relative paths
+        self.config = {}  # Will contain absolute paths
         self.check_config()
 
         # check if the config file exists, if not prompt to create one
         if not os.path.exists(self.config_path):
 
             # show the default yaml file and confirm the user wants to save it
-            print("Default Configuration: \n", yaml.dump(self.config, default_flow_style=False))
+            print("Default Configuration: \n", yaml.dump(self.config_raw, default_flow_style=False))
             print("Would you like to save the above configuration file? (y/n): ", end="")
 
             if 'y' in input().strip().lower():
@@ -39,6 +40,7 @@ class ConfigurationManager:
         # TODO: global paths should be imported from an environment variable or similar these are the locations 
         # where the user stores their images/videos generally on their system. 
         return {
+            "notebook_title": "Quick-md Notebook",
             "local": {
                 "md_path": "../../",
                 "images_path": "../../images", 
@@ -57,33 +59,46 @@ class ConfigurationManager:
         }
 
     def check_config(self): 
-        #confirm that all config options in default are present in self.config, if not use default
+        #confirm that all config options in default are present in self.config_raw, if not use default
         default_config = self.get_default_config()
 
         for field, value in default_config.items():
 
             # add any missing fields with default
-            if field not in self.config:
-                self.config[field] = value
+            if field not in self.config_raw:
+                self.config_raw[field] = value
 
             else:
                 # Handle dictionary fields (local, global)
                 if isinstance(value, dict):
                     for option, value in value.items():
-                        if option not in self.config[field]:
-                            self.config[field][option] = value
+                        if option not in self.config_raw[field]:
+                            self.config_raw[field][option] = value
                 # Handle list fields (Images, Videos, Markdown)
                 elif isinstance(value, list):
-                    if not isinstance(self.config[field], list):
-                        self.config[field] = value
+                    if not isinstance(self.config_raw[field], list):
+                        self.config_raw[field] = value
 
     def sub_config_paths(self):
         self.check_config()
+        # Start with a copy of raw config
+        import copy
+        self.config = copy.deepcopy(self.config_raw)
+        
+        # Base path for resolving relative paths (directory containing config file)
+        config_dir = os.path.dirname(self.config_path)
+        
+        # Convert relative paths to absolute in self.config (working copy)
         for section, options in self.config.items():
             # Only process dictionary sections (local, global) for path substitution
             if isinstance(options, dict):
                 for option, path in options.items():
-                    abs_path = os.path.abspath(os.path.join(self.script_dir, os.path.expanduser(path)))
+                    # Expand ~ and resolve relative to config file directory
+                    expanded_path = os.path.expanduser(path)
+                    if not os.path.isabs(expanded_path):
+                        abs_path = os.path.abspath(os.path.join(config_dir, expanded_path))
+                    else:
+                        abs_path = expanded_path
                     abs_path = os.path.normpath(abs_path)
                     self.config[section][option] = abs_path
 
@@ -94,32 +109,81 @@ class ConfigurationManager:
         return self.get_default_config()
 
     def save_config(self):
+        """Save config with relative paths in the local section"""
+        import copy
+        config_to_save = copy.deepcopy(self.config_raw)
+        
+        # Base path for converting to relative (directory containing config file)
+        config_dir = os.path.dirname(self.config_path)
+        
+        # Convert absolute paths back to relative in the local section
+        if 'local' in config_to_save and isinstance(config_to_save['local'], dict):
+            for option, path in config_to_save['local'].items():
+                if isinstance(path, str) and os.path.isabs(path):
+                    # Convert to relative path from the config file location
+                    rel_path = os.path.relpath(path, config_dir)
+                    config_to_save['local'][option] = rel_path
+        
         with open(self.config_path, 'w') as file:
-            yaml.safe_dump(self.config, file)
+            yaml.safe_dump(config_to_save, file)
     
     def add_image_to_config(self, relative_path):
         """Add an image path to the Images list in config"""
-        if "Images" not in self.config:
-            self.config["Images"] = []
-        if relative_path not in self.config["Images"]:
+        if "Images" not in self.config_raw:
+            self.config_raw["Images"] = []
+        if relative_path not in self.config_raw["Images"]:
+            self.config_raw["Images"].append(relative_path)
+            # Also update working copy
+            if "Images" not in self.config:
+                self.config["Images"] = []
             self.config["Images"].append(relative_path)
             self.save_config()
     
     def add_video_to_config(self, relative_path):
         """Add a video path to the Videos list in config"""
-        if "Videos" not in self.config:
-            self.config["Videos"] = []
-        if relative_path not in self.config["Videos"]:
+        if "Videos" not in self.config_raw:
+            self.config_raw["Videos"] = []
+        if relative_path not in self.config_raw["Videos"]:
+            self.config_raw["Videos"].append(relative_path)
+            # Also update working copy
+            if "Videos" not in self.config:
+                self.config["Videos"] = []
             self.config["Videos"].append(relative_path)
             self.save_config()
     
-    def add_markdown_to_config(self, relative_path):
-        """Add a markdown path to the Markdown list in config"""
-        if "Markdown" not in self.config:
-            self.config["Markdown"] = []
-        if relative_path not in self.config["Markdown"]:
+    def add_markdown_to_config(self, relative_path, original_title=None):
+        """Add a markdown path to the Markdown list in config with optional original title"""
+        if "Markdown" not in self.config_raw:
+            self.config_raw["Markdown"] = []
+        
+        # Check if this is already in the config
+        for item in self.config_raw["Markdown"]:
+            if isinstance(item, dict):
+                if item.get("filename") == relative_path:
+                    return
+            elif item == relative_path:
+                # Old format, don't add duplicate
+                return
+        
+        # Add new entry with original title if provided
+        if original_title:
+            new_entry = {
+                "filename": relative_path,
+                "title": original_title
+            }
+            self.config_raw["Markdown"].append(new_entry)
+            # Also update working copy
+            if "Markdown" not in self.config:
+                self.config["Markdown"] = []
+            self.config["Markdown"].append(new_entry)
+        else:
+            self.config_raw["Markdown"].append(relative_path)
+            # Also update working copy
+            if "Markdown" not in self.config:
+                self.config["Markdown"] = []
             self.config["Markdown"].append(relative_path)
-            self.save_config()
+        
+        self.save_config()
 
     def sanitize_filename(self, name, extension="", prepend_date=True):
         """Convert a name to snake_case, optionally prepend date, and add extension"""

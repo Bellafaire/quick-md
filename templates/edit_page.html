@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Edit {{ filename }} - Quick-md Notebook{% endblock %}
+{% block title %}Edit {{ page_title }} - {{ notebook_title }}{% endblock %}
 
 {% block extra_css %}
 <!-- CodeMirror CSS -->
@@ -227,7 +227,7 @@
 {% block content %}
 <div class="card">
     <div class="page-header">
-        <h2>Edit: {{ filename }}</h2>
+        <h2>Edit: {{ page_title }}</h2>
         <div class="button-group">
             <button onclick="openMediaPicker()" class="btn">Insert Media</button>
             <button onclick="togglePreview()" class="btn btn-secondary" id="preview-toggle">Show Preview</button>
