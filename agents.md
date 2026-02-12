@@ -27,8 +27,12 @@ This document outlines the development principles and requirements followed duri
 #### Configuration Manager
 - **Central source of truth** for all paths and settings
 - **`.qmd_conf` file** in parent directory manages everything
-- **Automatic path resolution** - Handles relative and absolute paths
+- **Dual storage** - Maintains both relative (config_raw) and absolute (config) paths
+- **Automatic path resolution** - Converts relative paths to absolute at runtime
+- **Relative path saving** - Stores paths relative to config file for portability
 - **Lists management** - Tracks Images, Videos, and Markdown files
+- **Backward compatibility** - Supports both old and new config formats
+- **Notebook title** - Configurable title for web interface branding
 
 #### Utility Functions
 - **Reusable functions** in `utils/` directory:
@@ -42,12 +46,14 @@ This document outlines the development principles and requirements followed duri
 #### Web Interface Features
 - **View pages** - Rendered markdown with images/videos/math
 - **Edit pages** - Split-view editor with live preview
-- **Create pages** - Date-prefixed filenames
+- **Create pages** - Date-prefixed filenames with original titles
 - **Upload media** - Images and videos with processing
 - **Media library** - Browse and insert media
 - **Auto-save** - Every 10 seconds if content changed
 - **MathJax support** - Inline `$...$` and display `$$...$$` equations
 - **Vim mode** - Optional CodeMirror Vim keybindings
+- **Password protection** - Optional session-based authentication
+- **Custom titles** - Configurable notebook title and page titles
 
 #### Mobile Responsiveness
 - **Breakpoints**:
@@ -78,8 +84,9 @@ This document outlines the development principles and requirements followed duri
 #### Media Processing
 - **Images** - Copied from screenshots directory
 - **Videos** - Processed with ffmpeg (resolution, compression)
-- **Relative paths** - Auto-detected based on configured directory structure
+- **Relative paths** - Auto-detected using `os.path.relpath()` based on actual file locations
 - **Config tracking** - All media added to `.qmd_conf`
+- **Path migration** - Script available (`migrate_media_paths.py`) to fix old hardcoded paths
 
 #### Markdown Generation
 - **Images** - `![alt text](relative/path/filename.png)` (auto-detected path)
@@ -90,9 +97,10 @@ This document outlines the development principles and requirements followed duri
 
 #### Backend
 - **Flask** - Web framework
-- **Python 3** - Programming language
+- **Python 3** - Programming language (3.6+, tested on 3.11)
 - **Threading** - Background web server
 - **YAML** - Configuration file format
+- **Session-based auth** - Flask sessions for password protection
 
 #### Frontend
 - **Vanilla JavaScript** - No frameworks
@@ -103,6 +111,11 @@ This document outlines the development principles and requirements followed duri
 #### Processing
 - **ffmpeg** - Video processing
 - **python-markdown** - Server-side markdown rendering
+
+#### Deployment
+- **Docker** - Containerized deployment with proper file ownership
+- **Docker Compose** - Service orchestration
+- **Web-only mode** - Headless server mode for Docker/remote deployments
 
 ### 7. Development Workflow
 
@@ -146,9 +159,15 @@ Solution: `_fix_media_paths()` converts to `/media/images/file.png` for web serv
 - Editor grows vertically with content
 
 #### Command Line Arguments
-- Port configuration via `-p` or `--port` flag
-- Default port: 6580
-- Example: `python3 main.py -p 8080`
+- **Port configuration** - `-p` or `--port` flag (default: 6580)
+- **Password protection** - `--password-protect` flag enables authentication
+- **Web-only mode** - `--web-only` flag runs server without TUI (for Docker/remote)
+- **Password via environment** - `QUICK_MD_PASSWORD` env var for non-interactive setups
+- **Examples**:
+  - `python3 main.py -p 8080`
+  - `python3 main.py --password-protect` (interactive prompt)
+  - `export QUICK_MD_PASSWORD=secret && python3 main.py --password-protect` (Docker)
+  - `python3 main.py --web-only --port 6580` (headless server)
 
 #### Responsive Button Layout
 - `.page-header` - Flex container for title and buttons
@@ -156,28 +175,61 @@ Solution: `_fix_media_paths()` converts to `/media/images/file.png` for web serv
 - Mobile: Full-width stacked buttons
 - Desktop: Inline buttons next to title
 
+#### Password Protection
+- **Session-based authentication** - Uses Flask sessions with secure keys
+- **Login page** - Standalone template with password form
+- **Route decorator** - `_check_password()` protects all routes except login/logout
+- **Logout support** - Conditional logout link in navigation
+- **Environment variable** - `QUICK_MD_PASSWORD` for Docker/non-interactive deployments
+- **Interactive prompt** - `getpass.getpass()` for native installations
+- **Status indicator** - TUI shows "(password protected)" when enabled
+
+#### Page Title Extraction
+- **First H1 detection** - Extracts actual page title from markdown content
+- **Browser tab titles** - Shows page title instead of filename
+- **Page headers** - Displays extracted title in view/edit pages
+- **Config storage** - Original titles stored alongside filenames in `.qmd_conf`
+- **Backward compatible** - Old format (string filenames) still supported
+
+#### Docker Deployment
+- **Web-only mode** - Runs without TUI using `--web-only` flag
+- **File ownership** - Container user matches host UID/GID via build args
+- **Environment variables** - `USER_ID`, `GROUP_ID`, `PORT`, `QUICK_MD_PASSWORD`
+- **Volume mounting** - Notebook directory mounted at `/notebook`
+- **Working directory** - Code runs from `/notebook/quick-md` for correct path resolution
+- **No tkinter** - Removed unnecessary GUI dependencies for headless operation
+- **Signal handling** - Graceful shutdown with Ctrl+C
+
 ### 9. File Structure
 
 ```
 quick-md/
-├── main.py                 # TUI entry point (accepts --port flag)
-├── web_server.py           # Flask server (runs in thread)
+├── main.py                 # Entry point with arg parsing (--port, --password-protect, --web-only)
+├── web_server.py           # Flask server with authentication and title extraction
 ├── requirements.txt        # Python dependencies
 ├── agents.md              # Development guidelines (this file)
+├── README.md              # User documentation
+├── DOCKER_QUICKSTART.md   # Docker quick reference
+├── Dockerfile             # Container image definition
+├── docker-compose.yml     # Service configuration
+├── .dockerignore          # Docker build exclusions
+├── .env.example           # Environment variable template
+├── migrate_media_paths.py # Script to fix old image/video paths
 ├── utils/
-│   ├── configurations_manager.py
-│   ├── image_handler.py
+│   ├── configurations_manager.py  # Config with dual path storage
+│   ├── image_handler.py          # Auto-detect relative paths
 │   ├── video_handler.py
-│   ├── menu.py            # TUI menu with web server integration
-│   ├── new_page_menu.py
+│   ├── menu.py                   # TUI menu with password support
+│   ├── new_page_menu.py          # Saves original page titles
 │   ├── new_image_menu.py
 │   └── new_video_menu.py
 └── templates/
-    ├── base.html          # Base template with nav and MathJax
+    ├── base.html          # Base template with nav, notebook title, MathJax
+    ├── login.html         # Password authentication page
     ├── index.html         # Homepage (unused - redirects to main.md)
-    ├── view_page.html     # View rendered markdown
-    ├── edit_page.html     # Editor with CodeMirror and Vim mode
-    ├── new_page.html      # Create new page form
+    ├── view_page.html     # View rendered markdown (shows page title)
+    ├── edit_page.html     # Editor with CodeMirror and page title
+    ├── new_page.html      # Create new page with title input
     ├── images.html        # Image gallery
     ├── videos.html        # Video gallery
     ├── upload_image.html  # Image upload form
@@ -188,44 +240,62 @@ quick-md/
 
 ```
 GET  /                           # Homepage - redirects to /page/main.md
-GET  /page/<filename>            # View rendered markdown page
-GET  /edit/<filename>            # Edit page with CodeMirror
-POST /save/<filename>            # Save page content
-GET  /new_page                   # New page form
-POST /new_page                   # Create new page
-GET  /images                     # Image gallery
-GET  /videos                     # Video gallery
-GET  /upload_image               # Image upload form
-POST /upload_image               # Upload and process image
-GET  /upload_video               # Video upload form
-POST /upload_video               # Upload and process video
-GET  /media/<path:filename>      # Serve media files
-POST /api/markdown_preview       # Convert markdown to HTML
-GET  /api/media_list             # Get lists of images and videos
+GET  /login                      # Password authentication page
+POST /login                      # Process login credentials
+GET  /logout                     # Clear session and logout
+GET  /page/<filename>            # View rendered markdown page (auth protected)
+GET  /edit/<filename>            # Edit page with CodeMirror (auth protected)
+POST /save/<filename>            # Save page content (auth protected)
+GET  /new_page                   # New page form (auth protected)
+POST /new_page                   # Create new page (auth protected)
+GET  /images                     # Image gallery (auth protected)
+GET  /videos                     # Video gallery (auth protected)
+GET  /upload_image               # Image upload form (auth protected)
+POST /upload_image               # Upload and process image (auth protected)
+GET  /upload_video               # Video upload form (auth protected)
+POST /upload_video               # Upload and process video (auth protected)
+GET  /media/<path:filename>      # Serve media files (auth protected)
+POST /api/markdown_preview       # Convert markdown to HTML (auth protected)
+GET  /api/media_list             # Get lists of images and videos (auth protected)
 ```
+
+**Note:** All routes except `/login` and `/logout` are protected by `_check_password` decorator when password protection is enabled.
 
 ### 11. Configuration Example
 
 ```yaml
+notebook_title: "Test Notebook"
 Images:
   - images/2025_12_31_example.png
   - images/2026_02_09_screenshot.png
 Markdown:
-  - 2025_12_31_intro_page.md
-  - 2026_02_09_notes.md
+  # New format with original titles (recommended)
+  - filename: 2025_12_31_intro_page.md
+    title: "Introduction Page"
+  - filename: 2026_02_09_notes.md
+    title: "My Research Notes"
+  # Old format still supported (backward compatible)
+  - 2026_02_10_legacy.md
 Videos:
   - videos/2025_12_31_demo.webm
 global:
   images_dir: /home/user/Pictures/Screenshots
   videos_dir: /home/user/Videos
 local:
-  figures_path: /home/user/notebook/figures
-  files_path: /home/user/notebook/files
-  images_path: /home/user/notebook/images
-  main_md: /home/user/notebook/main.md
-  md_path: /home/user/notebook
-  videos_path: /home/user/notebook/videos
+  # All paths stored as relative paths for portability
+  figures_path: figures
+  files_path: files
+  images_path: assets      # Auto-detected based on actual uploads
+  main_md: main.md
+  md_path: .
+  videos_path: assets      # Auto-detected based on actual uploads
 ```
+
+**Key Changes:**
+- Added `notebook_title` for web interface branding
+- Markdown entries now support dict format with `filename` and `title` keys
+- Local paths stored as relative paths (converted to absolute at runtime)
+- Media paths auto-detected using `os.path.relpath()`
 
 ### 12. User Experience Guidelines
 
@@ -252,9 +322,68 @@ The Quick-MD web interface was built with these principles:
 2. **Parallel operation** - Both interfaces run simultaneously
 3. **Shared codebase** - Reuse utility functions
 4. **Mobile-first** - Responsive design for all devices
-5. **Optional enhancements** - Vim mode, auto-save, etc.
+5. **Optional enhancements** - Vim mode, auto-save, password protection, etc.
 6. **Minimal changes** - Surgical modifications only
 7. **User-friendly** - Clear feedback and intuitive controls
 8. **Extensible** - Easy to add new features
+9. **Portable** - Relative path storage allows notebook relocation
+10. **Deployable** - Docker support with proper file ownership
 
 All features maintain consistency between the TUI and web interfaces while providing enhancements specific to each environment (keyboard shortcuts for TUI, live preview for web).
+
+## Recent Major Changes
+
+### Password Protection (2026-02-12)
+- Added `--password-protect` command-line flag
+- Session-based authentication using Flask sessions
+- `_check_password` decorator protects all routes except login/logout
+- `QUICK_MD_PASSWORD` environment variable for Docker/non-interactive use
+- Interactive `getpass.getpass()` prompt for native installations
+- Login/logout pages with proper redirects
+- Status indicator in TUI shows "(password protected)"
+
+### Docker Support (2026-02-12)
+- Complete Docker setup with Dockerfile and docker-compose.yml
+- `--web-only` flag runs server without TUI (infinite loop with sleep)
+- Container user matches host UID/GID via build args
+- Working directory at `/notebook/quick-md` for correct path resolution
+- Volume mount at `/notebook` for notebook directory
+- Environment variables: `USER_ID`, `GROUP_ID`, `PORT`, `QUICK_MD_PASSWORD`
+- Removed tkinter dependency (not needed for headless operation)
+- Documentation: README.md, DOCKER_QUICKSTART.md, .env.example
+
+### Configurable Notebook Title (2026-02-12)
+- Added `notebook_title` field to config
+- Context processor makes title available to all templates
+- Displayed in header, page titles, and login page
+- Defaults to "Quick-md Notebook" if not set
+
+### Page Title Storage & Display (2026-02-12)
+- Markdown entries now support dict format: `{filename: "...", title: "..."}`
+- Original page titles stored in config (not just filenames)
+- `_extract_title_from_markdown()` finds first H1 heading
+- Browser tab titles show actual page titles
+- Page headers display extracted titles
+- Backward compatible with old string format
+
+### Auto-Detected Media Paths (2026-02-12)
+- `os.path.relpath()` calculates relative paths dynamically
+- No hardcoded "images/" or "videos/" directories
+- Works with any directory structure (assets/, media/, etc.)
+- Applied to `image_handler.py` and upload routes
+- `migrate_media_paths.py` script fixes old config entries
+
+### Relative Path Storage (2026-02-12)
+- ConfigurationManager maintains dual storage:
+  - `config_raw`: relative paths (as stored in file)
+  - `config`: absolute paths (resolved at runtime)
+- `sub_config_paths()` resolves relative to config file directory
+- `save_config()` converts absolute back to relative
+- Allows notebook to be moved without breaking references
+- All `local` section paths stored as relative
+
+### Migration & Backward Compatibility
+- Old config format (string filenames) still works
+- `check_config()` ensures backward compatibility
+- Migration script available for media path fixes
+- Automatic path resolution handles both formats

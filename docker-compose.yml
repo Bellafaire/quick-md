@@ -1,0 +1,36 @@
+services:
+  quick-md:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Pass host user/group IDs to ensure files are owned by host user
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    container_name: quick-md-notebook
+    ports:
+      - "${PORT:-6580}:6580"
+    volumes:
+      # Mount your notebook directory
+      # Change the left side to your actual notebook path
+      - ../:/notebook
+      # Optional: Mount screenshots and videos directories if they're outside the notebook
+      # - ~/Pictures/Screenshots:/screenshots:ro
+      # - ~/Videos:/videos:ro
+    environment:
+      # Optional: Set custom port (must match the port mapping above)
+      - PORT=${PORT:-6580}
+      # Optional: Set password for web server (requires --password-protect in command)
+      - QUICK_MD_PASSWORD=${QUICK_MD_PASSWORD:-}
+    # Override command to pass arguments
+    # Default is web-only mode with port 6580
+    # Uncomment and modify to add password protection:
+    command: python3 main.py --web-only --port 6580 --password-protect
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+# Optional: Add a network for additional isolation
+# networks:
+#   quick-md-net:
+#     driver: bridge
