@@ -13,9 +13,10 @@ from utils.new_image_menu import NewImageMenu
 from utils.new_video_menu import NewVideoMenu
 
 class Menu:
-    def __init__(self, configuration_manager, port=6580):
+    def __init__(self, configuration_manager, port=6580, password=None):
         self.configuration_manager = configuration_manager
         self.port = port
+        self.password = password
 
         self.options = [
             "New Page", 
@@ -28,7 +29,7 @@ class Menu:
         ]
     
     def display_menu(self):
-        app = MenuApp(self.configuration_manager, self, self.port)
+        app = MenuApp(self.configuration_manager, self, self.port, self.password)
         app.run()
 
 
@@ -83,12 +84,13 @@ class MenuApp(App):
         Binding("7", "select(6)", "Option 7"),
     ]
     
-    def __init__(self, configuration_manager, menu_instance, port=6580):
+    def __init__(self, configuration_manager, menu_instance, port=6580, password=None):
         super().__init__()
         self.configuration_manager = configuration_manager
         self.menu_instance = menu_instance
         self.options = menu_instance.options
         self.port = port
+        self.password = password
         self.web_server = None
     
     def compose(self) -> ComposeResult:
@@ -107,10 +109,13 @@ class MenuApp(App):
         """Start web server when app mounts"""
         try:
             from web_server import WebServer
-            self.web_server = WebServer(self.configuration_manager, port=self.port)
+            self.web_server = WebServer(self.configuration_manager, port=self.port, password=self.password)
             self.web_server.start()
             address = self.web_server.get_address()
-            self.query_one("#web_server_status", Static).update(f"Web server: {address}")
+            status = f"Web server: {address}"
+            if self.password:
+                status += " (password protected)"
+            self.query_one("#web_server_status", Static).update(status)
         except Exception as e:
             self.query_one("#web_server_status", Static).update(f"Web server: Error starting")
     

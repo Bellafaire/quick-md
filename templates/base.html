@@ -257,6 +257,9 @@
             <li><a href="/upload_video">Add Video</a></li>
             <li><a href="/images">Images</a></li>
             <li><a href="/videos">Videos</a></li>
+            {% if password_protected %}
+            <li><a href="/logout">Logout</a></li>
+            {% endif %}
         </ul>
     </nav>
     

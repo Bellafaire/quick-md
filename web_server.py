@@ -1,20 +1,32 @@
 import threading
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, session, redirect, url_for
 import markdown
 import os
 import re
+from functools import wraps
 from utils import image_handler, video_handler
 
 class WebServer:
-    def __init__(self, config_manager, host='0.0.0.0', port=5000):
+    def __init__(self, config_manager, host='0.0.0.0', port=5000, password=None):
         self.config_manager = config_manager
         self.host = host
         self.port = port
+        self.password = password
         self.app = Flask(__name__)
         self.app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
+        self.app.secret_key = os.urandom(24)
         self.server_thread = None
         self.is_running = False
         self._setup_routes()
+    
+    def _check_password(self, f):
+        """Decorator to check if user is authenticated"""
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if self.password and not session.get('authenticated'):
+                return redirect(url_for('login'))
+            return f(*args, **kwargs)
+        return decorated_function
     
     def _fix_media_paths(self, html_content):
         """Convert relative media paths to absolute /media/ paths"""
@@ -27,12 +39,38 @@ class WebServer:
     def _setup_routes(self):
         """Setup all Flask routes"""
         
+        @self.app.context_processor
+        def inject_password_protected():
+            return {'password_protected': self.password is not None}
+        
+        @self.app.route('/login', methods=['GET', 'POST'])
+        def login():
+            if not self.password:
+                return redirect(url_for('index'))
+            
+            if request.method == 'POST':
+                password = request.form.get('password', '')
+                if password == self.password:
+                    session['authenticated'] = True
+                    return redirect(url_for('index'))
+                else:
+                    return render_template('login.html', error='Invalid password')
+            
+            return render_template('login.html')
+        
+        @self.app.route('/logout')
+        def logout():
+            session.pop('authenticated', None)
+            return redirect(url_for('login'))
+        
         @self.app.route('/')
+        @self._check_password
         def index():
             from flask import redirect, url_for
             return redirect(url_for('view_page', filename='main.md'))
         
         @self.app.route('/page/<path:filename>')
+        @self._check_password
         def view_page(filename):
             md_path = self.config_manager.config['local']['md_path']
             filepath = os.path.join(md_path, filename)
@@ -48,6 +86,7 @@ class WebServer:
             return render_template('view_page.html', filename=filename, content=content, html_content=html_content)
         
         @self.app.route('/edit/<path:filename>')
+        @self._check_password
         def edit_page(filename):
             md_path = self.config_manager.config['local']['md_path']
             filepath = os.path.join(md_path, filename)
@@ -61,6 +100,7 @@ class WebServer:
             return render_template('edit_page.html', filename=filename, content=content)
         
         @self.app.route('/save/<path:filename>', methods=['POST'])
+        @self._check_password
         def save_page(filename):
             md_path = self.config_manager.config['local']['md_path']
             filepath = os.path.join(md_path, filename)
@@ -73,6 +113,7 @@ class WebServer:
             return jsonify({'success': True, 'message': 'Page saved successfully'})
         
         @self.app.route('/new_page', methods=['GET', 'POST'])
+        @self._check_password
         def new_page():
             if request.method == 'POST':
                 title = request.form.get('title', '').strip()
@@ -100,16 +141,19 @@ class WebServer:
             return render_template('new_page.html')
         
         @self.app.route('/images')
+        @self._check_password
         def list_images():
             images = self.config_manager.config.get('Images', [])
             return render_template('images.html', images=images)
         
         @self.app.route('/videos')
+        @self._check_password
         def list_videos():
             videos = self.config_manager.config.get('Videos', [])
             return render_template('videos.html', videos=videos)
         
         @self.app.route('/upload_image', methods=['GET', 'POST'])
+        @self._check_password
         def upload_image():
             if request.method == 'POST':
                 if 'file' not in request.files:
@@ -147,6 +191,7 @@ class WebServer:
             return render_template('upload_image.html')
         
         @self.app.route('/upload_video', methods=['GET', 'POST'])
+        @self._check_password
         def upload_video():
             if request.method == 'POST':
                 if 'file' not in request.files:
@@ -201,6 +246,7 @@ class WebServer:
             return render_template('upload_video.html')
         
         @self.app.route('/media/<path:filename>')
+        @self._check_password
         def serve_media(filename):
             md_path = self.config_manager.config['local']['md_path']
             file_path = os.path.join(md_path, filename)
@@ -213,6 +259,7 @@ class WebServer:
             return send_from_directory(directory, file_name)
         
         @self.app.route('/api/markdown_preview', methods=['POST'])
+        @self._check_password
         def markdown_preview():
             content = request.json.get('content', '')
             html = markdown.markdown(content, extensions=['extra'])
@@ -220,6 +267,7 @@ class WebServer:
             return jsonify({'html': html})
         
         @self.app.route('/api/media_list')
+        @self._check_password
         def media_list():
             images = self.config_manager.config.get('Images', [])
             videos = self.config_manager.config.get('Videos', [])
