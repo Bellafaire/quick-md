@@ -129,8 +129,14 @@ class ConfigurationManager:
         with open(self.config_path, 'w') as file:
             yaml.safe_dump(config_to_save, file)
     
+    def reload_config(self):
+        """Re-read config from disk before making any edits."""
+        self.config_raw = self.load_config()
+        self.sub_config_paths()
+
     def add_image_to_config(self, relative_path):
         """Add an image path to the Images list in config"""
+        self.reload_config()
         if "Images" not in self.config_raw:
             self.config_raw["Images"] = []
         if relative_path not in self.config_raw["Images"]:
@@ -143,6 +149,7 @@ class ConfigurationManager:
     
     def add_video_to_config(self, relative_path):
         """Add a video path to the Videos list in config"""
+        self.reload_config()
         if "Videos" not in self.config_raw:
             self.config_raw["Videos"] = []
         if relative_path not in self.config_raw["Videos"]:
@@ -155,6 +162,7 @@ class ConfigurationManager:
     
     def add_markdown_to_config(self, relative_path, original_title=None):
         """Add a markdown path to the Markdown list in config with optional original title"""
+        self.reload_config()
         if "Markdown" not in self.config_raw:
             self.config_raw["Markdown"] = []
         
