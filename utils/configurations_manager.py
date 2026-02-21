@@ -35,18 +35,15 @@ class ConfigurationManager:
         #print(self.config)
 
     def get_default_config(self):
-        # the paths are a little wonky for now. 
-        # TODO: global paths should be imported from an environment variable or similar these are the locations 
-        # where the user stores their images/videos generally on their system. 
         return {
             "notebook_title": "Quick-md Notebook",
             "local": {
-                "md_path": "../../",
-                "images_path": "../../images", 
-                "videos_path": "../../videos", 
-                "figures_path": "../../figures", 
-                "files_path": "../../files", 
-                "main_md": "../../main.md"
+                "md_path": "docs/",
+                "images_path": "docs/images", 
+                "videos_path": "docs/videos", 
+                "figures_path": "docs/figures", 
+                "files_path": "docs/files", 
+                "main_md": "docs/main.md"
             }, 
             "global": {
                 "images_dir": "~/Pictures/Screenshots/",
@@ -100,6 +97,12 @@ class ConfigurationManager:
                         abs_path = expanded_path
                     abs_path = os.path.normpath(abs_path)
                     self.config[section][option] = abs_path
+
+        main_md = self.config['local']['main_md']
+        os.makedirs(os.path.dirname(main_md), exist_ok=True)
+        if not os.path.exists(main_md):
+            with open(main_md, 'w') as f:
+                f.write(f"# {self.config.get('notebook_title', 'Notebook')}\n\n")
 
     def load_config(self):
         if os.path.exists(self.config_path):

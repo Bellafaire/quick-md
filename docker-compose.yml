@@ -24,8 +24,9 @@ services:
       - QUICK_MD_PASSWORD=${QUICK_MD_PASSWORD:-}
     # Override command to pass arguments
     # Default is web-only mode with port 6580
-    # Uncomment and modify to add password protection:
-    command: python3 main.py --web-only --port 6580 --password-protect
+    # To enable password protection, set QUICK_MD_PASSWORD in .env and add --password-protect:
+    # command: python3 main.py --web-only --port 6580 --password-protect
+    command: python3 main.py --web-only --port 6580
     stdin_open: true
     tty: true
     restart: unless-stopped
