@@ -7,7 +7,7 @@ services:
         # Pass host user/group IDs to ensure files are owned by host user
         USER_ID: ${USER_ID:-1000}
         GROUP_ID: ${GROUP_ID:-1000}
-    container_name: quick-md-notebook
+    container_name: ${QUICK_MD_CONTAINER_NAME:quick_md_notebook}
     ports:
       - "${PORT:-6580}:6580"
     volumes:
