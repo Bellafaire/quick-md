@@ -7,7 +7,7 @@ services:
         # Pass host user/group IDs to ensure files are owned by host user
         USER_ID: ${USER_ID:-1000}
         GROUP_ID: ${GROUP_ID:-1000}
-    container_name: quick-md-notebook
+    container_name: ${QUICK_MD_CONTAINER_NAME:-quick_md_notebook}
     ports:
       - "${PORT:-6580}:6580"
     volumes:
@@ -24,8 +24,9 @@ services:
       - QUICK_MD_PASSWORD=${QUICK_MD_PASSWORD:-}
     # Override command to pass arguments
     # Default is web-only mode with port 6580
-    # Uncomment and modify to add password protection:
-    command: python3 main.py --web-only --port 6580 --password-protect
+    # To enable password protection, set QUICK_MD_PASSWORD in .env and add --password-protect:
+    # command: python3 main.py --web-only --port 6580 --password-protect
+    command: python3 main.py --web-only --port 6580
     stdin_open: true
     tty: true
     restart: unless-stopped
