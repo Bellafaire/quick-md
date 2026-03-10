@@ -16,8 +16,15 @@
         <input type="file" id="file" name="file" accept="image/*" required>
         
         <div id="preview-container" style="margin-bottom: 1rem;"></div>
-        
-        <button type="submit" class="btn">Upload Image</button>
+
+        <div id="progress-container" style="display:none; margin-bottom:1rem;">
+            <div style="height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;">
+                <div id="progress-bar" style="height:100%;background:#3498db;border-radius:4px;width:0;transition:width 0.2s;"></div>
+            </div>
+            <div id="progress-label" style="font-size:0.85rem;color:#666;margin-top:0.25rem;">Uploading…</div>
+        </div>
+
+        <button type="submit" class="btn" id="submit-btn">Upload Image</button>
         <a href="/images" class="btn btn-secondary" style="margin-left: 0.5rem;">Cancel</a>
     </form>
 </div>
@@ -56,37 +63,66 @@ function uploadImage(event) {
     event.preventDefault();
     
     const formData = new FormData(event.target);
-    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const submitBtn = document.getElementById('submit-btn');
+    const progressContainer = document.getElementById('progress-container');
+    const progressBar = document.getElementById('progress-bar');
+    const progressLabel = document.getElementById('progress-label');
+
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Uploading...';
-    
-    fetch('/upload_image', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Upload Image';
-        
-        if (data.success) {
-            markdownLinkText = data.markdown_link;
-            document.getElementById('result-preview').innerHTML = 
-                '<img src="/media/' + data.relative_path + '" style="max-width: 100%; max-height: 300px; border-radius: 4px; margin-bottom: 1rem;">';
-            document.getElementById('markdown-link').textContent = data.markdown_link;
-            document.getElementById('result-card').style.display = 'block';
-            event.target.reset();
-            document.getElementById('preview-container').innerHTML = '';
-            showMessage(data.message);
-        } else {
-            showMessage(data.message, true);
+    submitBtn.textContent = 'Uploading…';
+    progressContainer.style.display = 'block';
+    progressBar.style.width = '0';
+    progressLabel.textContent = 'Uploading… 0%';
+
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener('progress', function(e) {
+        if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = pct + '%';
+            progressLabel.textContent = 'Uploading… ' + pct + '%';
         }
-    })
-    .catch(error => {
+    });
+
+    xhr.addEventListener('load', function() {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Upload Image';
-        showMessage('Error uploading image', true);
+
+        if (xhr.status === 200) {
+            let data;
+            try { data = JSON.parse(xhr.responseText); } catch(e) { data = { success: false, message: 'Invalid response' }; }
+
+            if (data.success) {
+                progressBar.style.width = '100%';
+                progressLabel.textContent = 'Upload complete!';
+                markdownLinkText = data.markdown_link;
+                document.getElementById('result-preview').innerHTML = 
+                    '<img src="/media/' + data.relative_path + '" style="max-width: 100%; max-height: 300px; border-radius: 4px; margin-bottom: 1rem;">';
+                document.getElementById('markdown-link').textContent = data.markdown_link;
+                document.getElementById('result-card').style.display = 'block';
+                event.target.reset();
+                document.getElementById('preview-container').innerHTML = '';
+                progressContainer.style.display = 'none';
+                showMessage(data.message);
+            } else {
+                showMessage(data.message, true);
+                progressContainer.style.display = 'none';
+            }
+        } else {
+            showMessage('Error uploading image', true);
+            progressContainer.style.display = 'none';
+        }
     });
+
+    xhr.addEventListener('error', function() {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload Image';
+        progressContainer.style.display = 'none';
+        showMessage('Network error during upload', true);
+    });
+
+    xhr.open('POST', '/upload_image');
+    xhr.send(formData);
 }
 
 function copyToClipboard() {

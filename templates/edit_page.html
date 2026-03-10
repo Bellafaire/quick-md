@@ -221,6 +221,77 @@
         color: #666;
         font-family: monospace;
     }
+
+    .upload-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .upload-modal-content {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        max-width: 580px;
+        width: 90%;
+        max-height: 85vh;
+        overflow-y: auto;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    }
+
+    .upload-progress-container {
+        margin: 0.75rem 0;
+        display: none;
+    }
+
+    .upload-progress-bar-wrapper {
+        height: 8px;
+        background: #e0e0e0;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .upload-progress-bar {
+        height: 100%;
+        background: #3498db;
+        border-radius: 4px;
+        width: 0;
+        transition: width 0.2s;
+    }
+
+    .upload-progress-bar.processing {
+        background: linear-gradient(90deg, #3498db 25%, #5dade2 50%, #3498db 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s linear infinite;
+        width: 100% !important;
+        transition: none;
+    }
+
+    @keyframes shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+
+    .upload-progress-label {
+        font-size: 0.85rem;
+        color: #666;
+        margin-top: 0.25rem;
+    }
+
+    @media (max-width: 480px) {
+        .upload-modal-content {
+            width: 95%;
+            padding: 1rem;
+            max-height: 90vh;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -230,6 +301,8 @@
         <h2>Edit: {{ page_title }}</h2>
         <div class="button-group">
             <button onclick="openMediaPicker()" class="btn">Insert Media</button>
+            <button onclick="openUploadImageModal()" class="btn btn-secondary">Upload Image</button>
+            <button onclick="openUploadVideoModal()" class="btn btn-secondary">Upload Video</button>
             <button onclick="togglePreview()" class="btn btn-secondary" id="preview-toggle">Show Preview</button>
             <a href="/page/{{ filename }}" class="btn btn-secondary">Cancel</a>
         </div>
@@ -294,6 +367,96 @@
         
         <div id="videos-tab" class="media-list" style="display: none;">
             <!-- Videos will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<!-- Upload Image Modal -->
+<div id="upload-image-modal" class="upload-modal">
+    <div class="upload-modal-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2>Upload Image</h2>
+            <button onclick="closeUploadImageModal()" class="btn btn-secondary">✕</button>
+        </div>
+
+        <div id="upload-image-message"></div>
+
+        <form id="upload-image-form" onsubmit="uploadImageFromModal(event)">
+            <label for="modal-image-title">Image Title:</label>
+            <input type="text" id="modal-image-title" name="title" placeholder="Enter image title" required>
+
+            <label for="modal-image-file">Select Image:</label>
+            <input type="file" id="modal-image-file" name="file" accept="image/*" required>
+
+            <div id="modal-image-preview" style="margin-bottom: 1rem;"></div>
+
+            <div class="upload-progress-container" id="image-progress-container">
+                <div class="upload-progress-bar-wrapper">
+                    <div class="upload-progress-bar" id="image-progress-bar"></div>
+                </div>
+                <div class="upload-progress-label" id="image-progress-label">Uploading…</div>
+            </div>
+
+            <button type="submit" class="btn" id="upload-image-btn">Upload Image</button>
+        </form>
+
+        <div id="upload-image-result" style="display: none; margin-top: 1rem;">
+            <div id="upload-image-result-preview"></div>
+            <p id="upload-image-result-msg" style="color: #27ae60; margin-top: 0.5rem;"></p>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Video Modal -->
+<div id="upload-video-modal" class="upload-modal">
+    <div class="upload-modal-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2>Upload Video</h2>
+            <button onclick="closeUploadVideoModal()" class="btn btn-secondary">✕</button>
+        </div>
+
+        <div id="upload-video-message"></div>
+
+        <form id="upload-video-form" onsubmit="uploadVideoFromModal(event)">
+            <label for="modal-video-title">Video Title:</label>
+            <input type="text" id="modal-video-title" name="title" placeholder="Enter video title" required>
+
+            <label for="modal-video-file">Select Video:</label>
+            <input type="file" id="modal-video-file" name="file" accept="video/*" required>
+
+            <label for="modal-video-resolution">Resolution:</label>
+            <select id="modal-video-resolution" name="resolution">
+                <option value="480">480p</option>
+                <option value="720" selected>720p</option>
+                <option value="1080">1080p</option>
+            </select>
+
+            <label for="modal-video-compression">Compression Level:</label>
+            <select id="modal-video-compression" name="compression">
+                <option value="fast">Low (Faster)</option>
+                <option value="medium" selected>Medium</option>
+                <option value="slow">High (Slower)</option>
+            </select>
+
+            <div id="modal-video-preview" style="margin-bottom: 1rem;"></div>
+
+            <div class="upload-progress-container" id="video-progress-container">
+                <div class="upload-progress-bar-wrapper">
+                    <div class="upload-progress-bar" id="video-progress-bar"></div>
+                </div>
+                <div class="upload-progress-label" id="video-progress-label">Uploading…</div>
+            </div>
+
+            <p style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;">
+                <strong>Note:</strong> Video processing may take some time after upload completes.
+            </p>
+
+            <button type="submit" class="btn" id="upload-video-btn">Upload &amp; Process Video</button>
+        </form>
+
+        <div id="upload-video-result" style="display: none; margin-top: 1rem;">
+            <div id="upload-video-result-preview"></div>
+            <p id="upload-video-result-msg" style="color: #27ae60; margin-top: 0.5rem;"></p>
         </div>
     </div>
 </div>
@@ -557,6 +720,225 @@ document.getElementById('media-modal').addEventListener('click', function(e) {
         closeMediaPicker();
     }
 });
+
+document.getElementById('upload-image-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeUploadImageModal();
+});
+
+document.getElementById('upload-video-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeUploadVideoModal();
+});
+
+// ---- Upload Image Modal ----
+
+function openUploadImageModal() {
+    document.getElementById('upload-image-form').reset();
+    document.getElementById('modal-image-preview').innerHTML = '';
+    document.getElementById('image-progress-container').style.display = 'none';
+    document.getElementById('image-progress-bar').style.width = '0';
+    document.getElementById('image-progress-bar').classList.remove('processing');
+    document.getElementById('upload-image-result').style.display = 'none';
+    document.getElementById('upload-image-message').className = '';
+    document.getElementById('upload-image-message').textContent = '';
+    document.getElementById('upload-image-btn').disabled = false;
+    document.getElementById('upload-image-btn').textContent = 'Upload Image';
+    document.getElementById('upload-image-modal').style.display = 'flex';
+}
+
+function closeUploadImageModal() {
+    document.getElementById('upload-image-modal').style.display = 'none';
+}
+
+document.getElementById('modal-image-file').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            document.getElementById('modal-image-preview').innerHTML =
+                '<img src="' + evt.target.result + '" style="max-width:100%;max-height:200px;border-radius:4px;">';
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+function uploadImageFromModal(event) {
+    event.preventDefault();
+
+    const formData = new FormData(document.getElementById('upload-image-form'));
+    const submitBtn = document.getElementById('upload-image-btn');
+    const progressContainer = document.getElementById('image-progress-container');
+    const progressBar = document.getElementById('image-progress-bar');
+    const progressLabel = document.getElementById('image-progress-label');
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Uploading…';
+    progressContainer.style.display = 'block';
+    progressBar.classList.remove('processing');
+    progressBar.style.width = '0';
+    progressLabel.textContent = 'Uploading… 0%';
+
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener('progress', function(e) {
+        if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = pct + '%';
+            progressLabel.textContent = 'Uploading… ' + pct + '%';
+        }
+    });
+
+    xhr.addEventListener('load', function() {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload Image';
+
+        if (xhr.status === 200) {
+            let data;
+            try { data = JSON.parse(xhr.responseText); } catch(e) { data = { success: false, message: 'Invalid response' }; }
+
+            if (data.success) {
+                progressBar.style.width = '100%';
+                progressLabel.textContent = 'Upload complete!';
+
+                document.getElementById('upload-image-result-preview').innerHTML =
+                    '<img src="/media/' + data.relative_path + '" style="max-width:100%;max-height:200px;border-radius:4px;margin-bottom:0.5rem;">';
+                document.getElementById('upload-image-result-msg').textContent = data.message;
+                document.getElementById('upload-image-result').style.display = 'block';
+
+                insertMedia(data.relative_path, true);
+                loadMedia();
+                setTimeout(closeUploadImageModal, 1500);
+            } else {
+                showUploadMessage('upload-image-message', data.message, true);
+                progressContainer.style.display = 'none';
+            }
+        } else {
+            showUploadMessage('upload-image-message', 'Error uploading image', true);
+            progressContainer.style.display = 'none';
+        }
+    });
+
+    xhr.addEventListener('error', function() {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload Image';
+        progressContainer.style.display = 'none';
+        showUploadMessage('upload-image-message', 'Network error during upload', true);
+    });
+
+    xhr.open('POST', '/upload_image');
+    xhr.send(formData);
+}
+
+// ---- Upload Video Modal ----
+
+function openUploadVideoModal() {
+    document.getElementById('upload-video-form').reset();
+    document.getElementById('modal-video-preview').innerHTML = '';
+    document.getElementById('video-progress-container').style.display = 'none';
+    document.getElementById('video-progress-bar').style.width = '0';
+    document.getElementById('video-progress-bar').classList.remove('processing');
+    document.getElementById('upload-video-result').style.display = 'none';
+    document.getElementById('upload-video-message').className = '';
+    document.getElementById('upload-video-message').textContent = '';
+    document.getElementById('upload-video-btn').disabled = false;
+    document.getElementById('upload-video-btn').textContent = 'Upload & Process Video';
+    document.getElementById('upload-video-modal').style.display = 'flex';
+}
+
+function closeUploadVideoModal() {
+    document.getElementById('upload-video-modal').style.display = 'none';
+}
+
+document.getElementById('modal-video-file').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            document.getElementById('modal-video-preview').innerHTML =
+                '<video src="' + evt.target.result + '" controls style="max-width:100%;max-height:200px;border-radius:4px;"></video>';
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+function uploadVideoFromModal(event) {
+    event.preventDefault();
+
+    const formData = new FormData(document.getElementById('upload-video-form'));
+    const submitBtn = document.getElementById('upload-video-btn');
+    const progressContainer = document.getElementById('video-progress-container');
+    const progressBar = document.getElementById('video-progress-bar');
+    const progressLabel = document.getElementById('video-progress-label');
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Uploading…';
+    progressContainer.style.display = 'block';
+    progressBar.classList.remove('processing');
+    progressBar.style.width = '0';
+    progressLabel.textContent = 'Uploading… 0%';
+
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener('progress', function(e) {
+        if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = pct + '%';
+            progressLabel.textContent = 'Uploading… ' + pct + '%';
+        }
+    });
+
+    xhr.upload.addEventListener('load', function() {
+        progressBar.classList.add('processing');
+        progressLabel.textContent = 'Processing video… this may take a while';
+        submitBtn.textContent = 'Processing…';
+    });
+
+    xhr.addEventListener('load', function() {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload & Process Video';
+        progressBar.classList.remove('processing');
+
+        if (xhr.status === 200) {
+            let data;
+            try { data = JSON.parse(xhr.responseText); } catch(e) { data = { success: false, message: 'Invalid response' }; }
+
+            if (data.success) {
+                progressBar.style.width = '100%';
+                progressLabel.textContent = 'Processing complete!';
+
+                document.getElementById('upload-video-result-preview').innerHTML =
+                    '<video controls style="max-width:100%;max-height:200px;border-radius:4px;margin-bottom:0.5rem;"><source src="/media/' + data.relative_path + '" type="video/webm"></video>';
+                document.getElementById('upload-video-result-msg').textContent = data.message;
+                document.getElementById('upload-video-result').style.display = 'block';
+
+                insertMedia(data.relative_path, false);
+                loadMedia();
+                setTimeout(closeUploadVideoModal, 1500);
+            } else {
+                showUploadMessage('upload-video-message', data.message, true);
+                progressContainer.style.display = 'none';
+            }
+        } else {
+            showUploadMessage('upload-video-message', 'Error uploading video', true);
+            progressContainer.style.display = 'none';
+        }
+    });
+
+    xhr.addEventListener('error', function() {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload & Process Video';
+        progressContainer.style.display = 'none';
+        showUploadMessage('upload-video-message', 'Network error during upload', true);
+    });
+
+    xhr.open('POST', '/upload_video');
+    xhr.send(formData);
+}
+
+function showUploadMessage(containerId, text, isError = false) {
+    const div = document.getElementById(containerId);
+    div.className = 'message ' + (isError ? 'error' : 'success');
+    div.textContent = text;
+}
 
 function updatePreview() {
     if (!previewVisible) return;

@@ -2,6 +2,15 @@
 
 {% block title %}Upload Video - Quick-md Notebook{% endblock %}
 
+{% block extra_css %}
+<style>
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="card">
     <h2>Upload Video</h2>
@@ -30,12 +39,19 @@
         </select>
         
         <div id="preview-container" style="margin-bottom: 1rem;"></div>
-        
+
+        <div id="progress-container" style="display:none; margin-bottom:1rem;">
+            <div style="height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;">
+                <div id="progress-bar" style="height:100%;background:#3498db;border-radius:4px;width:0;transition:width 0.2s;"></div>
+            </div>
+            <div id="progress-label" style="font-size:0.85rem;color:#666;margin-top:0.25rem;">Uploading…</div>
+        </div>
+
         <p style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;">
             <strong>Note:</strong> Video processing may take some time depending on file size and compression settings.
         </p>
         
-        <button type="submit" class="btn">Upload & Process Video</button>
+        <button type="submit" class="btn" id="submit-btn">Upload &amp; Process Video</button>
         <a href="/videos" class="btn btn-secondary" style="margin-left: 0.5rem;">Cancel</a>
     </form>
 </div>
@@ -74,37 +90,81 @@ function uploadVideo(event) {
     event.preventDefault();
     
     const formData = new FormData(event.target);
-    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const submitBtn = document.getElementById('submit-btn');
+    const progressContainer = document.getElementById('progress-container');
+    const progressBar = document.getElementById('progress-bar');
+    const progressLabel = document.getElementById('progress-label');
+
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Processing... This may take a while';
-    
-    fetch('/upload_video', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Upload & Process Video';
-        
-        if (data.success) {
-            videoTagText = data.video_tag;
-            document.getElementById('result-preview').innerHTML = 
-                '<video controls style="max-width: 100%; max-height: 300px; border-radius: 4px; margin-bottom: 1rem;"><source src="/media/' + data.relative_path + '" type="video/mp4"></video>';
-            document.getElementById('video-tag').textContent = data.video_tag;
-            document.getElementById('result-card').style.display = 'block';
-            event.target.reset();
-            document.getElementById('preview-container').innerHTML = '';
-            showMessage(data.message);
-        } else {
-            showMessage(data.message, true);
+    submitBtn.textContent = 'Uploading…';
+    progressContainer.style.display = 'block';
+    progressBar.style.width = '0';
+    progressBar.style.background = '#3498db';
+    progressBar.style.backgroundSize = '';
+    progressBar.style.animation = '';
+    progressLabel.textContent = 'Uploading… 0%';
+
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener('progress', function(e) {
+        if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = pct + '%';
+            progressLabel.textContent = 'Uploading… ' + pct + '%';
         }
-    })
-    .catch(error => {
+    });
+
+    xhr.upload.addEventListener('load', function() {
+        progressBar.style.width = '100%';
+        progressBar.style.background = 'linear-gradient(90deg, #3498db 25%, #5dade2 50%, #3498db 75%)';
+        progressBar.style.backgroundSize = '200% 100%';
+        progressBar.style.animation = 'shimmer 1.5s linear infinite';
+        progressLabel.textContent = 'Processing video… this may take a while';
+        submitBtn.textContent = 'Processing…';
+    });
+
+    xhr.addEventListener('load', function() {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Upload & Process Video';
-        showMessage('Error uploading video', true);
+        progressBar.style.animation = '';
+        progressBar.style.backgroundSize = '';
+        progressBar.style.background = '#3498db';
+
+        if (xhr.status === 200) {
+            let data;
+            try { data = JSON.parse(xhr.responseText); } catch(e) { data = { success: false, message: 'Invalid response' }; }
+
+            if (data.success) {
+                progressBar.style.width = '100%';
+                progressLabel.textContent = 'Processing complete!';
+                videoTagText = data.video_tag;
+                document.getElementById('result-preview').innerHTML = 
+                    '<video controls style="max-width: 100%; max-height: 300px; border-radius: 4px; margin-bottom: 1rem;"><source src="/media/' + data.relative_path + '" type="video/mp4"></video>';
+                document.getElementById('video-tag').textContent = data.video_tag;
+                document.getElementById('result-card').style.display = 'block';
+                event.target.reset();
+                document.getElementById('preview-container').innerHTML = '';
+                progressContainer.style.display = 'none';
+                showMessage(data.message);
+            } else {
+                showMessage(data.message, true);
+                progressContainer.style.display = 'none';
+            }
+        } else {
+            showMessage('Error uploading video', true);
+            progressContainer.style.display = 'none';
+        }
     });
+
+    xhr.addEventListener('error', function() {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload & Process Video';
+        progressContainer.style.display = 'none';
+        showMessage('Network error during upload', true);
+    });
+
+    xhr.open('POST', '/upload_video');
+    xhr.send(formData);
 }
 
 function copyToClipboard() {
