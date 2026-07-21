@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Diagrams - {{ notebook_title }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Diagrams</h2>
+    <a href="/new_drawio" class="btn">New Diagram</a>
+</div>
+
+{% if diagrams %}
+<div class="grid">
+    {% for diagram in diagrams %}
+    <div class="media-item">
+        <!-- .drawio.svg files are real SVGs, so they render inline as images. -->
+        <img src="/media/{{ diagram }}" alt="{{ diagram }}" loading="lazy">
+        <p style="font-weight: 600; margin-bottom: 0.5rem;">{{ diagram.split('/')[-1] }}</p>
+        <div class="code-display">![alt text]({{ diagram }})</div>
+        <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+            <a href="/edit_drawio/{{ diagram }}" class="btn" style="flex:1; text-align:center;">Edit</a>
+            <button onclick="copyToClipboard('![alt text]({{ diagram }})')" class="btn btn-secondary" style="flex:1;">Copy Markdown</button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <p>No diagrams yet. <a href="/new_drawio">Create your first diagram!</a></p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+    });
+}
+{% endblock %}

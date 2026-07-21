@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} - {{ notebook_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .drawio-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+    }
+    .drawio-header h2 { margin: 0; flex: 1; min-width: 200px; }
+    .drawio-title-input {
+        width: 100%;
+        max-width: 360px;
+        margin-bottom: 0;
+    }
+    .drawio-toolbar {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .drawio-frame-wrap {
+        position: relative;
+        width: 100%;
+        height: calc(100vh - 175px);
+        min-height: 420px;
+        border: 1px solid var(--c-border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        background: var(--c-surface);
+    }
+    .drawio-frame-wrap iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        display: block;
+    }
+    .drawio-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 0.5rem;
+        background: var(--c-surface);
+        color: var(--c-muted);
+        font-size: 0.95rem;
+        z-index: 5;
+    }
+    .drawio-overlay.hidden { display: none; }
+    .drawio-spinner {
+        width: 1.6rem; height: 1.6rem;
+        border: 3px solid var(--c-border);
+        border-top-color: var(--c-accent);
+        border-radius: 50%;
+        animation: qmd-spin 0.8s linear infinite;
+    }
+    @keyframes qmd-spin { to { transform: rotate(360deg); } }
+    .drawio-saving-badge {
+        margin-left: 0.5rem;
+        font-size: 0.85rem;
+        color: var(--c-muted);
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    .drawio-saving-badge.visible { opacity: 1; }
+    .drawio-saving-badge.ok { color: var(--c-ok); }
+    .drawio-saving-badge.err { color: var(--c-err); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="drawio-header">
+        <h2>{{ page_title }}</h2>
+        <div class="drawio-toolbar">
+            <span id="saving-badge" class="drawio-saving-badge"></span>
+            <button onclick="saveDiagram(false)" class="btn">Save</button>
+            <button onclick="saveDiagram(true)" class="btn">Save &amp; Close</button>
+            <a href="/drawio" class="btn btn-secondary">Cancel</a>
+        </div>
+    </div>
+
+    {% if not filename %}
+    <label for="diagram-title">Diagram Title:</label>
+    <input type="text" id="diagram-title" class="drawio-title-input"
+           placeholder="Enter a title for this diagram" required
+           style="margin-bottom: 1rem;">
+    {% endif %}
+
+    <div id="message"></div>
+
+    <div class="drawio-frame-wrap">
+        <div id="drawio-overlay" class="drawio-overlay">
+            <div class="drawio-spinner"></div>
+            <div>Loading diagram editor…</div>
+            <div style="font-size:0.8rem;">Requires an internet connection (loads the draw.io editor from diagrams.net).</div>
+        </div>
+        <!-- draw.io embed editor. We drive it via the JSON postMessage protocol:
+             load the diagram on 'init', and request an xmlsvg export on save.
+             No `ui=min` so draw.io uses its full UI with the left shapes pane and
+             right format pane docked (like the standalone app). -->
+        <iframe id="drawio-frame"
+                src="https://embed.diagrams.net/?embed=1&proto=json&noSaveBtn=1&noExitBtn=1&gapi=0&db=0&gl=0&tr=0"
+                allow="clipboard-read; clipboard-write"
+                referrerpolicy="no-referrer"></iframe>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+// This page always uses the "Full" content width (no max-width), regardless of
+// the saved width preference, so the draw.io editor has the whole viewport.
+(function () {
+    document.documentElement.style.setProperty('--content-width', 'none');
+    var sel = document.getElementById('width-selector');
+    if (sel && sel.parentElement) sel.parentElement.style.display = 'none';
+})();
+
+// Diagram source the editor should open with. Empty -> a blank diagram.
+const INITIAL_XML = {{ initial_xml|tojson|safe if initial_xml else '""'|safe }};
+const FILENAME = {{ filename|tojson|safe }};
+const IS_NEW = !FILENAME;
+
+// A minimal empty draw.io document so the editor starts blank but ready.
+const BLANK_XML = '<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>';
+
+let iframe = document.getElementById('drawio-frame');
+let overlay = document.getElementById('drawio-overlay');
+let editorReady = false;
+// The last diagram XML we've seen (kept in sync via export responses) so we
+// can inject it as a fallback if an export SVG ever lacks its own embedding.
+let lastSeenXml = '';
+
+function postToEditor(msg) {
+    iframe.contentWindow.postMessage(JSON.stringify(msg), '*');
+}
+
+function showBadge(text, kind) {
+    const b = document.getElementById('saving-badge');
+    b.textContent = text || '';
+    b.className = 'drawio-saving-badge visible' + (kind ? ' ' + kind : '');
+    if (kind !== 'err') {
+        setTimeout(() => { b.classList.remove('visible'); }, 2500);
+    }
+}
+
+function showMessage(text, isError = false) {
+    const m = document.getElementById('message');
+    m.className = 'message ' + (isError ? 'error' : 'success');
+    m.textContent = text;
+    setTimeout(() => { m.className = ''; m.textContent = ''; }, 4000);
+}
+
+// ---- draw.io embed protocol ----
+window.addEventListener('message', function(evt) {
+    let msg;
+    try { msg = JSON.parse(evt.data); } catch (e) { return; }
+    if (!msg || !msg.event) return;
+
+    if (msg.event === 'init') {
+        // Editor is ready: load the current diagram (blank for new pages).
+        postToEditor({
+            action: 'load',
+            xml: INITIAL_XML || BLANK_XML,
+            autosave: 0,
+        });
+    } else if (msg.event === 'load') {
+        editorReady = true;
+        overlay.classList.add('hidden');
+    } else if (msg.event === 'export') {
+        // Response to our save-time export request. We ask for the 'xmlsvg'
+        // format, but draw.io reports the result back as format 'svg'
+        // (it overwrites msg.format before posting). `data` is the embedded
+        // SVG (draw.io's .drawio.svg format); `xml` is the raw diagram source,
+        // kept as a fallback embedding.
+        if (msg.format === 'svg' || msg.format === 'xmlsvg') {
+            lastSeenXml = msg.xml || lastSeenXml;
+            handleExportedSvg(msg.data, msg.xml);
+        }
+    } else if (msg.event === 'exit') {
+        // User hit an in-editor close action; go back to the list.
+        window.location.href = '/drawio';
+    }
+});
+
+// Save flow: ask draw.io for an SVG that embeds its own diagram source.
+function requestExport() {
+    if (!editorReady) {
+        showMessage('Editor is still loading, please wait…', true);
+        return false;
+    }
+    postToEditor({
+        action: 'export',
+        format: 'xmlsvg',
+        asText: true,
+        spin: 'Saving…',
+    });
+    return true;
+}
+
+function saveDiagram(closeAfter) {
+    if (IS_NEW) {
+        const title = document.getElementById('diagram-title').value.trim();
+        if (!title) {
+            showMessage('Please enter a diagram title first.', true);
+            document.getElementById('diagram-title').focus();
+            return;
+        }
+    }
+    showBadge('Saving…');
+    if (!requestExport()) return;
+    window._closeAfterSave = closeAfter;
+}
+
+let _pendingSvg = null;
+let _pendingXml = null;
+function handleExportedSvg(svg, xml) {
+    _pendingSvg = svg;
+    _pendingXml = xml;
+    if (IS_NEW) {
+        saveNew(svg, xml);
+    } else {
+        saveExisting(svg, xml);
+    }
+}
+
+function saveNew(svg, xml) {
+    const title = document.getElementById('diagram-title').value.trim();
+    fetch('/save_drawio_new', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: title, svg: svg, xml: xml }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showBadge('Saved', 'ok');
+            showMessage(data.message);
+            // We've now created the file; further saves must update it in place.
+            window.location.href = '/edit_drawio/' + encodeURIComponent(data.relative_path);
+        } else {
+            showBadge('Save failed', 'err');
+            showMessage(data.message, true);
+        }
+    })
+    .catch(err => {
+        showBadge('Save failed', 'err');
+        showMessage('Network error: ' + err, true);
+    });
+}
+
+function saveExisting(svg, xml) {
+    fetch('/save_drawio/' + encodeURIComponent(FILENAME), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ svg: svg, xml: xml }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showBadge('Saved', 'ok');
+            showMessage(data.message);
+            if (window._closeAfterSave) {
+                window.location.href = '/drawio';
+            }
+        } else {
+            showBadge('Save failed', 'err');
+            showMessage(data.message, true);
+        }
+    })
+    .catch(err => {
+        showBadge('Save failed', 'err');
+        showMessage('Network error: ' + err, true);
+    });
+}
+
+// Ctrl/Cmd+S inside the host page triggers a save (keeps editor open).
+window.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveDiagram(false);
+    }
+});
+
+// Expose for the inline onclick handlers (they run in global scope).
+window.saveDiagram = saveDiagram;
+</script>
+{% endblock %}

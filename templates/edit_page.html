@@ -62,15 +62,18 @@
 
     .sidebar-upload-buttons {
         display: flex;
-        gap: 0.5rem;
-        padding: 0.75rem 1rem 0.5rem;
+        gap: 0.4rem;
+        padding: 0.75rem 0.75rem 0.5rem;
         flex-shrink: 0;
     }
 
     .sidebar-upload-buttons .btn {
-        flex: 1;
-        padding: 0.4rem 0.5rem;
-        font-size: 0.85rem;
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 0.4rem 0.3rem;
+        font-size: 0.8rem;
+        white-space: nowrap;
+        text-align: center;
     }
 
     .sidebar-search {
@@ -449,6 +452,7 @@
         <div class="sidebar-upload-buttons">
             <button onclick="openUploadImageModal()" class="btn btn-secondary">+ Image</button>
             <button onclick="openUploadVideoModal()" class="btn btn-secondary">+ Video</button>
+            <button onclick="openNewDrawioPage()" class="btn btn-secondary">+ Diagram</button>
         </div>
 
         <input type="text" id="media-search" class="sidebar-search" placeholder="Search media (grep)..." oninput="renderSidebarMedia()">
@@ -457,6 +461,7 @@
             <button class="sidebar-tab active" data-tab="all" onclick="switchSidebarTab('all')">All</button>
             <button class="sidebar-tab" data-tab="images" onclick="switchSidebarTab('images')">Images</button>
             <button class="sidebar-tab" data-tab="videos" onclick="switchSidebarTab('videos')">Videos</button>
+            <button class="sidebar-tab" data-tab="drawio" onclick="switchSidebarTab('drawio')">Diagrams</button>
         </div>
 
         <div id="media-list" class="sidebar-media-list">
@@ -615,7 +620,7 @@ let view = null;
 const vimCompartment = new Compartment();
 let vimModeEnabled = false;
 let previewVisible = false;
-let mediaData = { images: [], videos: [] };
+let mediaData = { images: [], videos: [], drawio: [] };
 let lastSavedContent = '';
 let autoSaveInterval = null;
 let currentSidebarTab = 'all';
@@ -783,7 +788,7 @@ function loadMedia() {
 // updates and the "Processing…" badge clears the moment the file appears.
 function scheduleProcessingRefresh() {
     if (mediaRefreshTimer) return;
-    const items = mediaData.images.concat(mediaData.videos);
+    const items = mediaData.images.concat(mediaData.videos).concat(mediaData.drawio);
     if (!items.some(i => i.processing)) return;
     mediaRefreshTimer = setTimeout(() => {
         mediaRefreshTimer = null;
@@ -795,11 +800,13 @@ function getFilteredMedia() {
     const query = (document.getElementById('media-search').value || '').toLowerCase().trim();
     let items = [];
     if (currentSidebarTab === 'all') {
-        items = mediaData.images.concat(mediaData.videos);
+        items = mediaData.images.concat(mediaData.videos).concat(mediaData.drawio);
     } else if (currentSidebarTab === 'images') {
         items = mediaData.images;
-    } else {
+    } else if (currentSidebarTab === 'videos') {
         items = mediaData.videos;
+    } else if (currentSidebarTab === 'drawio') {
+        items = mediaData.drawio;
     }
     // Backend sorts each list by date desc; the combined "all" view needs a re-sort.
     items = items.slice().sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
@@ -821,6 +828,7 @@ function renderSidebarMedia() {
     container.innerHTML = items.map(item => {
         const processing = !!item.processing;
         const failed = !!item.failed;
+        const isDrawio = !!item.is_drawio;
         let thumb, statusLine;
         if (processing) {
             thumb = `<div class="sidebar-media-thumb sidebar-media-thumb-processing">⏳</div>`;
@@ -836,11 +844,19 @@ function renderSidebarMedia() {
             thumb = `<div class="sidebar-media-thumb sidebar-media-thumb-failed">✕</div>`;
             statusLine = `<div class="sidebar-media-failed">Failed (encode error)</div>`;
         } else {
-            thumb = item.is_video
+            // Diagrams are SVGs, so they preview as images just like real images.
+            thumb = (item.is_video && !isDrawio)
                 ? `<video src="/media/${item.path}" class="sidebar-media-thumb" muted preload="metadata"></video>`
                 : `<img src="/media/${item.path}" class="sidebar-media-thumb" alt="${item.filename}">`;
             statusLine = `<div class="sidebar-media-date">${item.date}</div>`;
         }
+        // Diagrams get an extra inline Edit link (opens the draw.io editor in a
+        // new tab) since they're not edited as raw text.
+        const editLink = isDrawio
+            ? `<a class="sidebar-media-insert btn btn-secondary" href="/edit_drawio/${encodeURI(item.path)}" target="_blank" rel="noopener" style="margin-right:0.25rem;">Edit</a>`
+            : '';
+        // Diagrams insert as markdown image links, same as images.
+        const isImage = isDrawio || !item.is_video;
         return `
             <div class="sidebar-media-item">
                 ${thumb}
@@ -848,7 +864,8 @@ function renderSidebarMedia() {
                     <div class="sidebar-media-filename" title="${item.filename}">${item.filename}</div>
                     ${statusLine}
                 </div>
-                <button class="sidebar-media-insert" data-path="${item.path}" data-is-image="${!item.is_video}">Insert</button>
+                ${editLink}
+                <button class="sidebar-media-insert" data-path="${item.path}" data-is-image="${isImage}">Insert</button>
             </div>
         `;
     }).join('');
@@ -869,6 +886,19 @@ document.getElementById('upload-image-modal').addEventListener('click', function
 
 document.getElementById('upload-video-modal').addEventListener('click', function(e) {
     if (e.target === this) closeUploadVideoModal();
+});
+
+// Open the draw.io diagram editor in a new tab. After the diagram is saved
+// there, it appears in this sidebar on the next media refresh.
+function openNewDrawioPage() {
+    window.open('/new_drawio', '_blank', 'noopener');
+}
+// The diagram editor runs in another tab. Refresh the sidebar whenever the
+// user comes back to this tab so newly saved diagrams show up immediately.
+function refreshMediaIfReady() { loadMedia(); }
+window.addEventListener('focus', refreshMediaIfReady);
+document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) refreshMediaIfReady();
 });
 
 // ---- Upload Image Modal ----
@@ -1177,7 +1207,7 @@ Object.assign(window, {
     togglePreview, toggleVimMode, toggleMediaSidebar, switchSidebarTab,
     openUploadImageModal, closeUploadImageModal, uploadImageFromModal,
     openUploadVideoModal, closeUploadVideoModal, uploadVideoFromModal,
-    insertMedia, saveContent, updatePreview, showMessage,
+    openNewDrawioPage, insertMedia, saveContent, updatePreview, showMessage,
 });
 </script>
 {% endblock %}

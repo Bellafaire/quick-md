@@ -8,7 +8,7 @@ import glob
 import json
 from functools import wraps
 from datetime import datetime
-from utils import image_handler, video_handler
+from utils import image_handler, video_handler, drawio_handler
 from utils.theme import resolve_theme
 
 class WebServer:
@@ -35,8 +35,8 @@ class WebServer:
     
     def _fix_media_paths(self, html_content):
         """Convert relative media paths to absolute /media/ paths"""
-        # Fix image tags: src="images/..." or src="videos/..." -> src="/media/images/..."
-        html_content = re.sub(r'src="((?:images|videos)/[^"]+)"', r'src="/media/\1"', html_content)
+        # Fix image/video tags: src="images/..." or src="videos/..." or src="figures/..." (draw.io diagrams) -> src="/media/..."
+        html_content = re.sub(r'src="((?:images|videos|figures)/[^"]+)"', r'src="/media/\1"', html_content)
         # Fix markdown image syntax that got converted to HTML
         html_content = re.sub(r'<img alt="([^"]*)" src="([^"]+)"', lambda m: f'<img alt="{m.group(1)}" src="/media/{m.group(2)}"' if not m.group(2).startswith(('/media/', 'http')) else m.group(0), html_content)
         return html_content
@@ -423,6 +423,90 @@ class WebServer:
             
             return render_template('upload_video.html')
         
+        @self.app.route('/drawio')
+        @self._check_password
+        def list_drawio():
+            diagrams = self.config_manager.config.get('Drawio', [])
+            # Sort newest first by file mtime
+            md_path = self.config_manager.config['local']['md_path']
+            diagrams = sorted(diagrams, key=lambda p: os.path.getmtime(os.path.join(md_path, p)) if os.path.exists(os.path.join(md_path, p)) else 0, reverse=True)
+            return render_template('drawio.html', diagrams=diagrams)
+
+        @self.app.route('/new_drawio')
+        @self._check_password
+        def new_drawio():
+            return render_template('drawio_editor.html', filename=None, page_title='New Diagram', initial_xml='')
+
+        @self.app.route('/edit_drawio/<path:filename>')
+        @self._check_password
+        def edit_drawio(filename):
+            md_path = self.config_manager.config['local']['md_path']
+            filepath = os.path.join(md_path, filename)
+            if not os.path.exists(filepath):
+                return "Diagram not found", 404
+            with open(filepath, 'r', encoding='utf-8') as f:
+                svg = f.read()
+            initial_xml = drawio_handler.extract_embedded_xml(svg) or ''
+            title = os.path.basename(filename)
+            return render_template('drawio_editor.html', filename=filename, page_title=title, initial_xml=initial_xml)
+
+        @self.app.route('/save_drawio_new', methods=['POST'])
+        @self._check_password
+        def save_drawio_new():
+            data = request.get_json(silent=True) or {}
+            title = (data.get('title') or '').strip()
+            svg = data.get('svg') or ''
+            xml = data.get('xml') or ''
+            if not title:
+                return jsonify({'success': False, 'message': 'Title is required'})
+            if not svg:
+                return jsonify({'success': False, 'message': 'No diagram content provided'})
+
+            filename = self.config_manager.sanitize_filename(title, extension='.drawio.svg')
+            dest_directory = self.config_manager.config['local']['figures_path']
+            os.makedirs(dest_directory, exist_ok=True)
+            dest_path = os.path.join(dest_directory, filename)
+            # Avoid clobbering an existing diagram silently.
+            if os.path.exists(dest_path):
+                return jsonify({'success': False, 'message': 'A diagram with this name already exists'})
+
+            try:
+                drawio_handler.write_embedded_svg(svg, dest_path, fallback_xml=xml)
+            except ValueError as e:
+                return jsonify({'success': False, 'message': str(e)})
+
+            md_path = self.config_manager.config['local']['md_path']
+            relative_dir = os.path.relpath(dest_directory, md_path)
+            relative_path = f"{relative_dir}/{filename}"
+            self.config_manager.add_drawio_to_config(relative_path)
+
+            markdown_link = f"![{title}]({relative_path})"
+            return jsonify({
+                'success': True,
+                'message': 'Diagram saved successfully',
+                'markdown_link': markdown_link,
+                'relative_path': relative_path,
+                'filename': filename,
+            })
+
+        @self.app.route('/save_drawio/<path:filename>', methods=['POST'])
+        @self._check_password
+        def save_drawio(filename):
+            md_path = self.config_manager.config['local']['md_path']
+            filepath = os.path.join(md_path, filename)
+            if not os.path.exists(filepath):
+                return jsonify({'success': False, 'message': 'Diagram not found'}), 404
+            data = request.get_json(silent=True) or {}
+            svg = data.get('svg') or ''
+            xml = data.get('xml') or ''
+            if not svg:
+                return jsonify({'success': False, 'message': 'No diagram content provided'})
+            try:
+                drawio_handler.write_embedded_svg(svg, dest_path=filepath, fallback_xml=xml)
+            except ValueError as e:
+                return jsonify({'success': False, 'message': str(e)})
+            return jsonify({'success': True, 'message': 'Diagram saved successfully'})
+
         @self.app.route('/media/<path:filename>')
         @self._check_password
         def serve_media(filename):
@@ -449,11 +533,18 @@ class WebServer:
         def media_list():
             images = self.config_manager.config.get('Images', [])
             videos = self.config_manager.config.get('Videos', [])
+            diagrams = self.config_manager.config.get('Drawio', [])
             image_details = self._media_details(images, is_video=False)
             video_details = self._media_details(videos, is_video=True)
+            # Diagrams are static SVGs (no background processing), so reuse the
+            # media-details helper with is_video=False to get timestamps/dates.
+            diagram_details = self._media_details(diagrams, is_video=False)
+            for d in diagram_details:
+                d['is_drawio'] = True
             return jsonify({
                 'images': image_details,
                 'videos': video_details,
+                'drawio': diagram_details,
             })
     
     def start(self):

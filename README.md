@@ -15,6 +15,7 @@ A git submodule utility for maintaining a markdown notebook with both TUI and we
 - Create and manage markdown pages with automatic date prefixing
 - Add images from screenshots directory with automatic copying and markdown link generation
 - Add videos with automatic ffmpeg processing and compression
+- **Draw.io Diagrams**: Create and edit draw.io diagrams right in the web page; they're saved as `.drawio.svg` files (real SVGs that render inline in your pages without any export step) and stay re-editable. Diagrams are managed alongside images and videos and inserted into pages the same way  
 - View and edit markdown with live preview (web interface)
 - Copy markdown links and HTML tags to clipboard
 
@@ -246,7 +247,7 @@ local:
   md_path: .                    # Markdown files directory
   images_path: assets           # Images directory  
   videos_path: assets           # Videos directory
-  figures_path: assets          # Figures directory
+  figures_path: assets          # Directory for .drawio.svg diagrams (draw.io figures)
   files_path: assets            # Other files directory
   main_md: main.md             # Main index file
 ```
@@ -300,6 +301,15 @@ editor.
 - `static/js/mathjax-tex-svg.js` — MathJax 3 with the **SVG output renderer**
   (chosen over CHTML because SVG needs no font files, making true offline use
   trivial). The input config (`$...$` inline, `$$...$$` display) is unchanged.
+
+> **Note: draw.io diagrams require an internet connection (for now).** The
+> diagram editor is loaded from `https://embed.diagrams.net/` at edit time, so
+> creating/editing a diagram needs internet. Viewing saved `.drawio.svg`
+> diagrams in your pages is fully offline (they're ordinary SVGs).
+> **TODO (offline):** self-host the draw.io web app under `static/drawio/` and
+> point the embed iframe at the local copy so editing works offline too. It's
+> a large static app (tens of MB of shape libraries, stencils, and fonts), so
+> it is intentionally not vendored yet.
 
 ### Rebuilding the editor bundle
 

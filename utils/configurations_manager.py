@@ -56,6 +56,7 @@ class ConfigurationManager:
             },
             "Images": [],
             "Videos": [],
+            "Drawio": [],
             "Markdown": []
         }
 
@@ -168,6 +169,19 @@ class ConfigurationManager:
             self.config["Videos"].append(relative_path)
             self.save_config()
     
+    def add_drawio_to_config(self, relative_path):
+        """Add a drawio diagram path to the Drawio list in config"""
+        self.reload_config()
+        if "Drawio" not in self.config_raw:
+            self.config_raw["Drawio"] = []
+        if relative_path not in self.config_raw["Drawio"]:
+            self.config_raw["Drawio"].append(relative_path)
+            # Also update working copy
+            if "Drawio" not in self.config:
+                self.config["Drawio"] = []
+            self.config["Drawio"].append(relative_path)
+            self.save_config()
+
     def add_markdown_to_config(self, relative_path, original_title=None):
         """Add a markdown path to the Markdown list in config with optional original title"""
         self.reload_config()
