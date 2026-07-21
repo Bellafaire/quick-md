@@ -1,3 +1,5 @@
 __pycache__/
 
-
+# Vendored editor build artifacts (node_modules etc.). The final bundled
+# output in static/js/ IS committed so the app works offline with no build step.
+vendor/.build/

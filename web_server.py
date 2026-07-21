@@ -4,6 +4,7 @@ import markdown
 import os
 import re
 from functools import wraps
+from datetime import datetime
 from utils import image_handler, video_handler
 
 class WebServer:
@@ -44,6 +45,30 @@ class WebServer:
             if line.startswith('# '):
                 return line[2:].strip()
         return None
+
+    def _media_details(self, paths, is_video):
+        """Build a list of media detail dicts sorted by upload date (newest first).
+
+        Uses the file's modification time on disk as a proxy for the upload
+        date (files are written once on upload and not normally touched
+        afterwards)."""
+        md_path = self.config_manager.config['local']['md_path']
+        result = []
+        for p in paths:
+            full = os.path.join(md_path, p)
+            try:
+                mtime = os.path.getmtime(full)
+            except OSError:
+                mtime = 0
+            result.append({
+                'path': p,
+                'filename': os.path.basename(p),
+                'timestamp': mtime,
+                'date': datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M') if mtime else 'unknown',
+                'is_video': is_video,
+            })
+        result.sort(key=lambda x: x['timestamp'], reverse=True)
+        return result
     
     def _setup_routes(self):
         """Setup all Flask routes"""
@@ -170,12 +195,18 @@ class WebServer:
         @self._check_password
         def list_images():
             images = self.config_manager.config.get('Images', [])
+            # Sort newest first by file mtime
+            md_path = self.config_manager.config['local']['md_path']
+            images = sorted(images, key=lambda p: os.path.getmtime(os.path.join(md_path, p)) if os.path.exists(os.path.join(md_path, p)) else 0, reverse=True)
             return render_template('images.html', images=images)
         
         @self.app.route('/videos')
         @self._check_password
         def list_videos():
             videos = self.config_manager.config.get('Videos', [])
+            # Sort newest first by file mtime
+            md_path = self.config_manager.config['local']['md_path']
+            videos = sorted(videos, key=lambda p: os.path.getmtime(os.path.join(md_path, p)) if os.path.exists(os.path.join(md_path, p)) else 0, reverse=True)
             return render_template('videos.html', videos=videos)
         
         @self.app.route('/upload_image', methods=['GET', 'POST'])
@@ -303,7 +334,12 @@ class WebServer:
         def media_list():
             images = self.config_manager.config.get('Images', [])
             videos = self.config_manager.config.get('Videos', [])
-            return jsonify({'images': images, 'videos': videos})
+            image_details = self._media_details(images, is_video=False)
+            video_details = self._media_details(videos, is_video=True)
+            return jsonify({
+                'images': image_details,
+                'videos': video_details,
+            })
     
     def start(self):
         """Start the web server in a background thread"""

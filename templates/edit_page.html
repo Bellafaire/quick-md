@@ -3,117 +3,208 @@
 {% block title %}Edit {{ page_title }} - {{ notebook_title }}{% endblock %}
 
 {% block extra_css %}
-<!-- CodeMirror CSS -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/material-darker.min.css">
 <style>
-    #media-modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.5);
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-    }
-    
-    #media-modal-content {
-        background: white;
-        border-radius: 8px;
-        padding: 1.5rem;
-        max-width: 800px;
-        width: 90%;
-        max-height: 80vh;
-        overflow-y: auto;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-    }
-    
-    .media-tabs {
+    /* ---- Editor layout: media sidebar + main editor area ---- */
+    .editor-layout {
         display: flex;
-        gap: 0.5rem;
-        margin-bottom: 1rem;
-        border-bottom: 2px solid #ddd;
+        gap: 1rem;
+        align-items: flex-start;
     }
-    
-    .media-tab {
-        padding: 0.6rem 1rem;
+
+    .media-sidebar {
+        width: 280px;
+        flex-shrink: 0;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100vh - 140px);
+        position: sticky;
+        top: 1rem;
+        overflow: hidden;
+    }
+
+    .media-sidebar.collapsed {
+        display: none;
+    }
+
+    .sidebar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #eee;
+        flex-shrink: 0;
+    }
+
+    .sidebar-header h3 {
+        margin: 0;
+        font-size: 1rem;
+    }
+
+    .sidebar-icon-btn {
         background: none;
         border: none;
         cursor: pointer;
-        font-size: 0.95rem;
+        font-size: 1.1rem;
+        padding: 0.2rem 0.4rem;
+        color: #666;
+        border-radius: 4px;
+    }
+
+    .sidebar-icon-btn:hover {
+        background: #eee;
+    }
+
+    .sidebar-upload-buttons {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem 0.5rem;
+        flex-shrink: 0;
+    }
+
+    .sidebar-upload-buttons .btn {
+        flex: 1;
+        padding: 0.4rem 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .sidebar-search {
+        margin: 0 1rem 0.5rem;
+        padding: 0.5rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        width: calc(100% - 2rem);
+    }
+
+    .sidebar-tabs {
+        display: flex;
+        gap: 0.25rem;
+        padding: 0 0.5rem;
+        border-bottom: 2px solid #eee;
+        flex-shrink: 0;
+    }
+
+    .sidebar-tab {
+        padding: 0.4rem 0.6rem;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 0.85rem;
         color: #666;
         border-bottom: 3px solid transparent;
         margin-bottom: -2px;
     }
-    
-    .media-tab.active {
+
+    .sidebar-tab.active {
         color: #3498db;
         border-bottom-color: #3498db;
         font-weight: 600;
     }
-    
-    .media-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
+
+    .sidebar-media-list {
+        overflow-y: auto;
+        flex: 1;
+        padding: 0.5rem;
     }
-    
-    .media-item-row {
+
+    .sidebar-media-empty {
+        text-align: center;
+        color: #999;
+        font-size: 0.85rem;
+        padding: 1.5rem 0.5rem;
+    }
+
+    .sidebar-media-item {
         display: flex;
         align-items: center;
-        gap: 0.75rem;
-        padding: 0.75rem;
-        border: 1px solid #ddd;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        border: 1px solid #eee;
         border-radius: 4px;
-        transition: background 0.2s;
+        margin-bottom: 0.5rem;
+        transition: border-color 0.2s, background 0.2s;
     }
-    
-    .media-item-row:hover {
-        background: #f8f9fa;
+
+    .sidebar-media-item:hover {
+        border-color: #3498db;
+        background: #f8fafc;
     }
-    
-    .media-preview {
-        width: 60px;
-        height: 60px;
+
+    .sidebar-media-thumb {
+        width: 44px;
+        height: 44px;
         object-fit: cover;
         border-radius: 4px;
         flex-shrink: 0;
+        background: #eee;
     }
-    
-    @media (max-width: 480px) {
-        #media-modal-content {
-            width: 95%;
-            padding: 1rem;
+
+    .sidebar-media-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .sidebar-media-filename {
+        font-size: 0.8rem;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .sidebar-media-date {
+        font-size: 0.7rem;
+        color: #888;
+    }
+
+    .sidebar-media-insert {
+        background: #27ae60;
+        color: white;
+        border: none;
+        padding: 0.3rem 0.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.75rem;
+        flex-shrink: 0;
+    }
+
+    .sidebar-media-insert:hover {
+        background: #219150;
+    }
+
+    #sidebar-show-btn {
+        position: sticky;
+        top: 1rem;
+        width: fit-content;
+    }
+
+    .editor-main {
+        flex: 1;
+        min-width: 0;
+    }
+
+    @media (max-width: 768px) {
+        .editor-layout {
+            flex-direction: column;
         }
-        
-        .media-preview {
-            width: 50px;
-            height: 50px;
-        }
-        
-        .media-item-row {
-            padding: 0.5rem;
-            gap: 0.5rem;
-        }
-        
-        .media-filename {
-            font-size: 0.9rem;
-        }
-        
-        .media-path {
-            font-size: 0.75rem;
+        .media-sidebar {
+            width: 100%;
+            position: relative;
+            top: 0;
+            max-height: 50vh;
         }
     }
-    
+
     .button-group {
         display: flex;
         gap: 0.5rem;
         flex-wrap: wrap;
     }
-    
+
     .page-header {
         display: flex;
         justify-content: space-between;
@@ -122,78 +213,88 @@
         gap: 1rem;
         flex-wrap: wrap;
     }
-    
+
     .page-header h2 {
         flex: 1;
         min-width: 200px;
     }
-    
+
     @media (max-width: 768px) {
         .page-header {
             flex-direction: column;
             align-items: stretch;
         }
-        
+
         .page-header h2 {
             font-size: 1.25rem;
             margin-bottom: 0.5rem;
         }
-        
+
         .button-group {
             width: 100%;
         }
-        
+
         .button-group > * {
             flex: 1;
             min-width: fit-content;
         }
     }
-    
-    /* CodeMirror customization */
-    .CodeMirror {
-        height: auto;
-        min-height: 300px;
+
+    /* ---- CodeMirror 6 editor ---- */
+    #codemirror-editor .cm-editor {
+        height: 70vh;
         border: 1px solid #ddd;
         border-radius: 4px;
-        font-size: 14px;
+    }
+
+    #codemirror-editor .cm-scroller {
+        overflow: auto;
         font-family: 'Courier New', 'Monaco', monospace;
+        font-size: 14px;
     }
-    
-    /* Hide scrollbars */
-    .CodeMirror-scroll {
-        overflow: hidden !important;
+
+    /* Editor + preview layout. `.split` switches to side-by-side; without it
+       the editor spans the full width and the preview is hidden. */
+    #editor-wrapper.split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        align-items: stretch;
     }
-    
-    .CodeMirror-vscrollbar,
-    .CodeMirror-hscrollbar {
-        display: none !important;
+
+    #editor-wrapper.split #editor-panel,
+    #editor-wrapper.split #preview-panel {
+        min-width: 0;
     }
-    
-    .vim-mode-indicator {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: #2c3e50;
-        color: white;
-        padding: 0.5rem 1rem;
+
+    #preview-panel {
+        display: none;
+    }
+
+    #editor-wrapper.split #preview-panel {
+        display: block;
+    }
+
+    #editor-wrapper.split #codemirror-editor .cm-editor {
+        height: 70vh;
+    }
+
+    #preview {
+        border: 1px solid #ddd;
         border-radius: 4px;
-        font-family: monospace;
-        z-index: 999;
-        font-size: 0.9rem;
+        padding: 1rem;
+        min-height: 400px;
+        background: white;
+        height: 70vh;
+        overflow-y: auto;
     }
-    
-    .vim-mode-indicator.normal {
-        background: #27ae60;
+
+    @media (max-width: 968px) {
+        #editor-wrapper.split {
+            grid-template-columns: 1fr;
+        }
     }
-    
-    .vim-mode-indicator.insert {
-        background: #3498db;
-    }
-    
-    .vim-mode-indicator.visual {
-        background: #e67e22;
-    }
-    
+
     .vim-toggle {
         display: flex;
         align-items: center;
@@ -201,25 +302,10 @@
         margin-bottom: 0.5rem;
         font-size: 0.9rem;
     }
-    
+
     .vim-toggle input[type="checkbox"] {
         width: auto;
         cursor: pointer;
-    }
-    
-    .media-info {
-        flex: 1;
-    }
-    
-    .media-filename {
-        font-weight: 600;
-        margin-bottom: 0.25rem;
-    }
-    
-    .media-path {
-        font-size: 0.85rem;
-        color: #666;
-        font-family: monospace;
     }
 
     .upload-modal {
@@ -296,77 +382,72 @@
 {% endblock %}
 
 {% block content %}
-<div class="card">
-    <div class="page-header">
-        <h2>Edit: {{ page_title }}</h2>
-        <div class="button-group">
-            <button onclick="openMediaPicker()" class="btn">Insert Media</button>
-            <button onclick="openUploadImageModal()" class="btn btn-secondary">Upload Image</button>
-            <button onclick="openUploadVideoModal()" class="btn btn-secondary">Upload Video</button>
-            <button onclick="togglePreview()" class="btn btn-secondary" id="preview-toggle">Show Preview</button>
-            <a href="/page/{{ filename }}" class="btn btn-secondary">Cancel</a>
+<div class="editor-layout">
+    <!-- Media sidebar -->
+    <aside class="media-sidebar" id="media-sidebar">
+        <div class="sidebar-header">
+            <h3>Media Library</h3>
+            <button onclick="toggleMediaSidebar()" class="sidebar-icon-btn" title="Hide media panel">◀</button>
         </div>
-    </div>
-    
-    <div id="message"></div>
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
-        <div class="vim-toggle">
-            <input type="checkbox" id="vim-mode-toggle">
-            <label for="vim-mode-toggle" style="margin: 0; cursor: pointer;">Enable Vim Mode</label>
+
+        <div class="sidebar-upload-buttons">
+            <button onclick="openUploadImageModal()" class="btn btn-secondary">+ Image</button>
+            <button onclick="openUploadVideoModal()" class="btn btn-secondary">+ Video</button>
         </div>
-        <span id="autosave-status" style="color: #666; font-size: 0.85rem;">Auto-save enabled</span>
-    </div>
-    
-    <div id="split-view" class="split-view" style="display: none;">
-        <div id="editor-panel">
-            <h3>Editor</h3>
-            <textarea id="content" style="display: none;">{{ content }}</textarea>
-            <div id="codemirror-editor"></div>
-            <button onclick="saveContent()" class="btn">Save Changes</button>
-            <button onclick="updatePreview()" class="btn btn-secondary" style="margin-left: 0.5rem;">Update Preview</button>
+
+        <input type="text" id="media-search" class="sidebar-search" placeholder="Search media (grep)..." oninput="renderSidebarMedia()">
+
+        <div class="sidebar-tabs">
+            <button class="sidebar-tab active" data-tab="all" onclick="switchSidebarTab('all')">All</button>
+            <button class="sidebar-tab" data-tab="images" onclick="switchSidebarTab('images')">Images</button>
+            <button class="sidebar-tab" data-tab="videos" onclick="switchSidebarTab('videos')">Videos</button>
         </div>
-        
-        <div id="preview-panel">
-            <h3>Preview</h3>
-            <div id="preview" class="markdown-content" style="border: 1px solid #ddd; border-radius: 4px; padding: 1rem; min-height: 400px; background: white;">
-                Loading preview...
+
+        <div id="media-list" class="sidebar-media-list">
+            <div class="sidebar-media-empty">Loading media…</div>
+        </div>
+    </aside>
+
+    <!-- Button to re-show the sidebar when collapsed -->
+    <button id="sidebar-show-btn" class="btn btn-secondary" style="display:none;" onclick="toggleMediaSidebar()">▶ Media</button>
+
+    <!-- Main editor area -->
+    <div class="editor-main">
+        <div class="card">
+            <div class="page-header">
+                <h2>Edit: {{ page_title }}</h2>
+                <div class="button-group">
+                    <button onclick="togglePreview()" class="btn btn-secondary" id="preview-toggle">Show Preview</button>
+                    <a href="/page/{{ filename }}" class="btn btn-secondary">Cancel</a>
+                </div>
             </div>
-        </div>
-    </div>
-    
-    <div id="full-editor">
-        <h3>Editor</h3>
-        <textarea id="content-full" style="display: none;">{{ content }}</textarea>
-        <div id="codemirror-editor-full"></div>
-        <button onclick="saveContent()" class="btn">Save Changes</button>
-        <button onclick="updatePreview()" class="btn btn-secondary" style="margin-left: 0.5rem;">Update Preview</button>
-    </div>
-</div>
 
-<!-- Vim Mode Indicator -->
-<div id="vim-indicator" class="vim-mode-indicator" style="display: none;">
-    NORMAL
-</div>
+            <div id="message"></div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div class="vim-toggle">
+                    <input type="checkbox" id="vim-mode-toggle">
+                    <label for="vim-mode-toggle" style="margin: 0; cursor: pointer;">Enable Vim Mode</label>
+                </div>
+                <span id="autosave-status" style="color: #666; font-size: 0.85rem;">Auto-save enabled</span>
+            </div>
 
-<!-- Media Picker Modal -->
-<div id="media-modal">
-    <div id="media-modal-content">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h2>Insert Media</h2>
-            <button onclick="closeMediaPicker()" class="btn btn-secondary">Close</button>
-        </div>
-        
-        <div class="media-tabs">
-            <button class="media-tab active" onclick="switchMediaTab('images')">Images</button>
-            <button class="media-tab" onclick="switchMediaTab('videos')">Videos</button>
-        </div>
-        
-        <div id="images-tab" class="media-list">
-            <!-- Images will be loaded here -->
-        </div>
-        
-        <div id="videos-tab" class="media-list" style="display: none;">
-            <!-- Videos will be loaded here -->
+            <!-- Hidden source for the initial document content -->
+            <textarea id="content-source" style="display:none;">{{ content }}</textarea>
+
+            <div id="editor-wrapper">
+                <div id="editor-panel">
+                    <div id="codemirror-editor"></div>
+                    <div style="margin-top: 0.5rem;">
+                        <button onclick="saveContent()" class="btn">Save Changes</button>
+                        <button onclick="updatePreview()" class="btn btn-secondary" style="margin-left: 0.5rem;">Update Preview</button>
+                    </div>
+                </div>
+
+                <div id="preview-panel">
+                    <h3>Preview</h3>
+                    <div id="preview" class="markdown-content">Loading preview...</div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -463,114 +544,96 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<!-- CodeMirror Scripts -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/markdown/markdown.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/keymap/vim.min.js"></script>
-{% endblock %}
+<!-- CodeMirror 6 editor (vendored, offline). Loaded as an ES module. -->
+<script type="module">
+import {
+    EditorView, basicSetup, EditorState, Compartment,
+    keymap, defaultKeymap, indentWithTab,
+    markdown, oneDark, vim
+} from '/static/js/qmd-editor.js';
 
-{% block scripts %}
+let view = null;
+const vimCompartment = new Compartment();
+let vimModeEnabled = false;
 let previewVisible = false;
 let mediaData = { images: [], videos: [] };
 let lastSavedContent = '';
 let autoSaveInterval = null;
-let codeMirrorEditor = null;
-let codeMirrorEditorFull = null;
-let vimModeEnabled = false;
+let currentSidebarTab = 'all';
+let previewTimeout = null;
 
-// Initialize CodeMirror editors
-function initCodeMirror() {
-    const textarea = document.getElementById('content');
-    const textareaFull = document.getElementById('content-full');
-    
-    // Main editor
-    codeMirrorEditor = CodeMirror(document.getElementById('codemirror-editor'), {
-        value: textarea.value,
-        mode: 'markdown',
-        lineNumbers: true,
-        lineWrapping: true,
-        theme: 'material-darker',
-        tabSize: 2,
-        indentUnit: 2,
-        viewportMargin: Infinity,
-        extraKeys: {
-            "Tab": function(cm) {
-                cm.replaceSelection("  ");
+// ---- Editor setup ----
+
+function buildExtensions() {
+    return [
+        basicSetup,
+        oneDark,
+        markdown(),
+        EditorView.lineWrapping,
+        keymap.of([...defaultKeymap, indentWithTab]),
+        // Vim is toggled at runtime via this compartment.
+        vimCompartment.of(vimModeEnabled ? vim({ status: true }) : []),
+        EditorView.updateListener.of(update => {
+            if (update.docChanged) {
+                clearTimeout(previewTimeout);
+                previewTimeout = setTimeout(updatePreview, 1000);
             }
-        }
+        }),
+    ];
+}
+
+function initEditor() {
+    const initialContent = document.getElementById('content-source').value;
+    view = new EditorView({
+        state: EditorState.create({ doc: initialContent, extensions: buildExtensions() }),
+        parent: document.getElementById('codemirror-editor'),
     });
-    
-    // Full editor
-    codeMirrorEditorFull = CodeMirror(document.getElementById('codemirror-editor-full'), {
-        value: textareaFull.value,
-        mode: 'markdown',
-        lineNumbers: true,
-        lineWrapping: true,
-        theme: 'material-darker',
-        tabSize: 2,
-        indentUnit: 2,
-        viewportMargin: Infinity,
-        extraKeys: {
-            "Tab": function(cm) {
-                cm.replaceSelection("  ");
-            }
-        }
-    });
-    
-    // Sync changes for auto-save
-    codeMirrorEditor.on('change', function() {
-        clearTimeout(previewTimeout);
-        previewTimeout = setTimeout(updatePreview, 1000);
-    });
-    
-    codeMirrorEditorFull.on('change', function() {
-        // Sync content
-        codeMirrorEditor.setValue(codeMirrorEditorFull.getValue());
-    });
-    
-    // Vim mode change handler
-    CodeMirror.on(codeMirrorEditor, 'vim-mode-change', updateVimIndicator);
-    CodeMirror.on(codeMirrorEditorFull, 'vim-mode-change', updateVimIndicator);
+    lastSavedContent = initialContent;
 }
 
 function toggleVimMode() {
     vimModeEnabled = !vimModeEnabled;
-    const keymap = vimModeEnabled ? 'vim' : 'default';
-    const indicator = document.getElementById('vim-indicator');
-    
-    codeMirrorEditor.setOption('keyMap', keymap);
-    codeMirrorEditorFull.setOption('keyMap', keymap);
-    
-    if (vimModeEnabled) {
-        indicator.style.display = 'block';
-        indicator.textContent = 'NORMAL';
-        indicator.className = 'vim-mode-indicator normal';
-    } else {
-        indicator.style.display = 'none';
+    if (view) {
+        view.dispatch({
+            effects: vimCompartment.reconfigure(vimModeEnabled ? vim({ status: true }) : []),
+        });
+        view.focus();
     }
-    
-    // Save preference to localStorage
-    localStorage.setItem('vimModeEnabled', vimModeEnabled);
+    localStorage.setItem('vimModeEnabled', String(vimModeEnabled));
 }
 
-function updateVimIndicator(modeObj) {
-    if (!vimModeEnabled) return;
-    
-    const indicator = document.getElementById('vim-indicator');
-    const mode = modeObj.mode;
-    
-    indicator.className = 'vim-mode-indicator';
-    
-    if (mode === 'insert') {
-        indicator.textContent = 'INSERT';
-        indicator.classList.add('insert');
-    } else if (mode === 'visual') {
-        indicator.textContent = 'VISUAL';
-        indicator.classList.add('visual');
+function togglePreview() {
+    previewVisible = !previewVisible;
+    const wrapper = document.getElementById('editor-wrapper');
+    const toggleBtn = document.getElementById('preview-toggle');
+    if (previewVisible) {
+        wrapper.classList.add('split');
+        toggleBtn.textContent = 'Hide Preview';
+        updatePreview();
     } else {
-        indicator.textContent = 'NORMAL';
-        indicator.classList.add('normal');
+        wrapper.classList.remove('split');
+        toggleBtn.textContent = 'Show Preview';
     }
+    // CM6 needs to re-measure after the container width changes.
+    if (view) {
+        view.requestMeasure();
+        view.focus();
+    }
+}
+
+function insertMedia(path, isImage) {
+    if (!view) return;
+    let mediaText;
+    if (isImage) {
+        const alt = path.split('/').pop().replace(/\.[^/.]+$/, '');
+        mediaText = `![${alt}](${path})`;
+    } else {
+        mediaText = `<video width="640" loop autoplay controls><source src="${path}" type="video/webm"></video>`;
+    }
+    view.focus();
+    view.dispatch(view.state.replaceSelection(mediaText));
+    if (previewVisible) updatePreview();
+    showMessage('Media inserted at cursor position');
 }
 
 function showMessage(text, isError = false) {
@@ -583,98 +646,85 @@ function showMessage(text, isError = false) {
     }, 3000);
 }
 
-function togglePreview() {
-    const splitView = document.getElementById('split-view');
-    const fullEditor = document.getElementById('full-editor');
-    const toggleBtn = document.getElementById('preview-toggle');
-    
-    previewVisible = !previewVisible;
-    
-    if (previewVisible) {
-        // Sync to split view
-        codeMirrorEditor.setValue(codeMirrorEditorFull.getValue());
-        splitView.style.display = 'grid';
-        fullEditor.style.display = 'none';
-        toggleBtn.textContent = 'Hide Preview';
-        codeMirrorEditor.refresh();
-        updatePreview();
-    } else {
-        // Sync to full view
-        codeMirrorEditorFull.setValue(codeMirrorEditor.getValue());
-        splitView.style.display = 'none';
-        fullEditor.style.display = 'block';
-        toggleBtn.textContent = 'Show Preview';
-        codeMirrorEditorFull.refresh();
+// ---- Media sidebar ----
+
+function toggleMediaSidebar() {
+    const sidebar = document.getElementById('media-sidebar');
+    const showBtn = document.getElementById('sidebar-show-btn');
+    const collapsed = sidebar.classList.toggle('collapsed');
+    showBtn.style.display = collapsed ? 'inline-block' : 'none';
+    if (!collapsed) {
+        loadMedia();
+        if (view) setTimeout(() => view.requestMeasure(), 50);
     }
 }
 
-function openMediaPicker() {
-    document.getElementById('media-modal').style.display = 'flex';
-    loadMedia();
-}
-
-function closeMediaPicker() {
-    document.getElementById('media-modal').style.display = 'none';
-}
-
-function switchMediaTab(tab) {
-    // Update tab buttons
-    document.querySelectorAll('.media-tab').forEach(btn => {
-        btn.classList.remove('active');
+function switchSidebarTab(tab) {
+    currentSidebarTab = tab;
+    document.querySelectorAll('.sidebar-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tab);
     });
-    event.target.classList.add('active');
-    
-    // Show/hide tab content
-    document.getElementById('images-tab').style.display = tab === 'images' ? 'flex' : 'none';
-    document.getElementById('videos-tab').style.display = tab === 'videos' ? 'flex' : 'none';
+    renderSidebarMedia();
 }
 
 function loadMedia() {
-    // Load images
     fetch('/api/media_list')
         .then(response => response.json())
         .then(data => {
             mediaData = data;
-            renderMediaList('images', data.images);
-            renderMediaList('videos', data.videos);
+            renderSidebarMedia();
         })
         .catch(error => {
             console.error('Error loading media:', error);
+            document.getElementById('media-list').innerHTML =
+                '<div class="sidebar-media-empty">Error loading media</div>';
         });
 }
 
-function renderMediaList(type, items) {
-    const container = document.getElementById(`${type}-tab`);
-    
+function getFilteredMedia() {
+    const query = (document.getElementById('media-search').value || '').toLowerCase().trim();
+    let items = [];
+    if (currentSidebarTab === 'all') {
+        items = mediaData.images.concat(mediaData.videos);
+    } else if (currentSidebarTab === 'images') {
+        items = mediaData.images;
+    } else {
+        items = mediaData.videos;
+    }
+    // Backend sorts each list by date desc; the combined "all" view needs a re-sort.
+    items = items.slice().sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    if (query) {
+        items = items.filter(item => item.filename.toLowerCase().indexOf(query) !== -1);
+    }
+    return items;
+}
+
+function renderSidebarMedia() {
+    const container = document.getElementById('media-list');
+    const items = getFilteredMedia();
+
     if (items.length === 0) {
-        container.innerHTML = '<p>No ' + type + ' found. <a href="/upload_' + (type === 'images' ? 'image' : 'video') + '">Upload one!</a></p>';
+        container.innerHTML = '<div class="sidebar-media-empty">No media found</div>';
         return;
     }
-    
-    // Sort by most recent (reverse order)
-    const sortedItems = [...items].reverse();
-    
-    container.innerHTML = sortedItems.map((item, index) => {
-        const filename = item.split('/').pop();
-        const isImage = type === 'images';
-        const preview = isImage 
-            ? `<img src="/media/${item}" class="media-preview" alt="${filename}">`
-            : `<video src="/media/${item}" class="media-preview"></video>`;
-        
+
+    container.innerHTML = items.map(item => {
+        const thumb = item.is_video
+            ? `<video src="/media/${item.path}" class="sidebar-media-thumb" muted preload="metadata"></video>`
+            : `<img src="/media/${item.path}" class="sidebar-media-thumb" alt="${item.filename}">`;
         return `
-            <div class="media-item-row">
-                ${preview}
-                <div class="media-info">
-                    <div class="media-filename">${filename}</div>
-                    <div class="media-path">${item}</div>
+            <div class="sidebar-media-item">
+                ${thumb}
+                <div class="sidebar-media-info">
+                    <div class="sidebar-media-filename" title="${item.filename}">${item.filename}</div>
+                    <div class="sidebar-media-date">${item.date}</div>
                 </div>
-                <button class="btn media-insert-btn" data-path="${item}" data-is-image="${isImage}">Insert</button>
+                <button class="sidebar-media-insert" data-path="${item.path}" data-is-image="${!item.is_video}">Insert</button>
             </div>
         `;
     }).join('');
-    
-    // Add event listeners to insert buttons
-    container.querySelectorAll('.media-insert-btn').forEach(btn => {
+
+    container.querySelectorAll('.sidebar-media-insert').forEach(btn => {
         btn.addEventListener('click', function() {
             const path = this.getAttribute('data-path');
             const isImage = this.getAttribute('data-is-image') === 'true';
@@ -683,44 +733,7 @@ function renderMediaList(type, items) {
     });
 }
 
-function insertMedia(path, isImage) {
-    const editor = previewVisible ? codeMirrorEditor : codeMirrorEditorFull;
-    
-    let mediaText;
-    if (isImage) {
-        const alt = path.split('/').pop().replace(/\.[^/.]+$/, '');
-        mediaText = `![${alt}](${path})`;
-    } else {
-        mediaText = `<video width="640" loop autoplay controls><source src="${path}" type="video/mp4"></video>`;
-    }
-    
-    // Insert at cursor position
-    const cursor = editor.getCursor();
-    editor.replaceRange(mediaText, cursor);
-    
-    // Move cursor after inserted text
-    const newCursor = editor.findPosH(cursor, mediaText.length, 'char');
-    editor.setCursor(newCursor);
-    editor.focus();
-    
-    // Update preview if visible
-    if (previewVisible) {
-        updatePreview();
-    }
-    
-    // Close modal
-    closeMediaPicker();
-    
-    showMessage('Media inserted at cursor position');
-}
-
-// Close modal when clicking outside
-document.getElementById('media-modal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        closeMediaPicker();
-    }
-});
-
+// Close upload modals when clicking outside
 document.getElementById('upload-image-modal').addEventListener('click', function(e) {
     if (e.target === this) closeUploadImageModal();
 });
@@ -940,15 +953,15 @@ function showUploadMessage(containerId, text, isError = false) {
     div.textContent = text;
 }
 
+// ---- Preview / save ----
+
 function updatePreview() {
-    if (!previewVisible) return;
-    
-    const content = codeMirrorEditor.getValue();
+    if (!previewVisible || !view) return;
+
+    const content = view.state.doc.toString();
     fetch('/api/markdown_preview', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: content })
     })
     .then(response => response.json())
@@ -965,18 +978,16 @@ function updatePreview() {
 }
 
 function saveContent(isAutoSave = false) {
-    const content = previewVisible ? 
-        codeMirrorEditor.getValue() : 
-        codeMirrorEditorFull.getValue();
-    
-    // Skip auto-save if content hasn't changed
+    if (!view) return;
+    const content = view.state.doc.toString();
+
     if (isAutoSave && content === lastSavedContent) {
         return;
     }
-    
+
     const formData = new FormData();
     formData.append('content', content);
-    
+
     fetch('/save/{{ filename }}', {
         method: 'POST',
         body: formData
@@ -985,27 +996,18 @@ function saveContent(isAutoSave = false) {
     .then(data => {
         if (data.success) {
             lastSavedContent = content;
+            const statusSpan = document.getElementById('autosave-status');
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             if (isAutoSave) {
-                // Update status indicator
-                const statusSpan = document.getElementById('autosave-status');
-                const now = new Date();
-                const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 statusSpan.textContent = `✓ Auto-saved at ${timeStr}`;
                 statusSpan.style.color = '#27ae60';
-                setTimeout(() => {
-                    statusSpan.style.color = '#666';
-                }, 2000);
+                setTimeout(() => { statusSpan.style.color = '#666'; }, 2000);
             } else {
                 showMessage(data.message);
-                // Update status for manual save too
-                const statusSpan = document.getElementById('autosave-status');
-                const now = new Date();
-                const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 statusSpan.textContent = `✓ Saved at ${timeStr}`;
             }
-            if (previewVisible) {
-                updatePreview();
-            }
+            if (previewVisible) updatePreview();
         } else {
             showMessage(data.message, true);
         }
@@ -1018,10 +1020,7 @@ function saveContent(isAutoSave = false) {
 }
 
 function startAutoSave() {
-    // Auto-save every 10 seconds
-    autoSaveInterval = setInterval(() => {
-        saveContent(true);
-    }, 10000);
+    autoSaveInterval = setInterval(() => { saveContent(true); }, 10000);
 }
 
 function stopAutoSave() {
@@ -1031,33 +1030,30 @@ function stopAutoSave() {
     }
 }
 
-// Initialize CodeMirror
-initCodeMirror();
+// ---- Init ----
 
-// Add event listener for Vim mode toggle
-document.getElementById('vim-mode-toggle').addEventListener('change', toggleVimMode);
+// Restore vim preference before building the editor.
+vimModeEnabled = localStorage.getItem('vimModeEnabled') === 'true';
 
-// Restore Vim mode preference
-const savedVimMode = localStorage.getItem('vimModeEnabled') === 'true';
-if (savedVimMode) {
-    document.getElementById('vim-mode-toggle').checked = true;
-    toggleVimMode();
-}
+initEditor();
 
-// Auto-update preview on load
-updatePreview();
+const vimToggle = document.getElementById('vim-mode-toggle');
+if (vimModeEnabled) vimToggle.checked = true;
+vimToggle.addEventListener('change', toggleVimMode);
 
-// Initialize auto-save
+loadMedia();
 startAutoSave();
 
-// Store initial content
-lastSavedContent = codeMirrorEditor.getValue();
+window.addEventListener('beforeunload', stopAutoSave);
 
-// Optional: Auto-update preview while typing (debounced)
-let previewTimeout;
-
-// Clean up on page unload
-window.addEventListener('beforeunload', function() {
-    stopAutoSave();
+// Expose inline-onclick handlers to the global scope (ES modules are isolated).
+Object.assign(window, {
+    togglePreview, toggleVimMode, toggleMediaSidebar, switchSidebarTab,
+    openUploadImageModal, closeUploadImageModal, uploadImageFromModal,
+    openUploadVideoModal, closeUploadVideoModal, uploadVideoFromModal,
+    insertMedia, saveContent, updatePreview, showMessage,
 });
+</script>
 {% endblock %}
+
+{% block scripts %}{% endblock %}

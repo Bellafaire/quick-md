@@ -1,3 +1,11 @@
+# NOTE: docker-compose.yml is kept for backward compatibility.
+# The recommended way to launch quick-md is now the ./run.sh script, which uses
+# `docker run` and supports running multiple instances side by side. See the
+# README for the full list of options.
+#
+# Example run.sh equivalent of this file:
+#   ./run.sh -p 6580 -c quick_md_notebook
+
 services:
   quick-md:
     build:

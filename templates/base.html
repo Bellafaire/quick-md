@@ -19,7 +19,7 @@
         }
     };
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
+    <script src="/static/js/mathjax-tex-svg.js" id="MathJax-script" async></script>
     
     <style>
         * {
@@ -52,6 +52,7 @@
             display: flex;
             gap: 1rem;
             flex-wrap: wrap;
+            align-items: center;
         }
         
         nav a {
@@ -64,8 +65,37 @@
             color: #3498db;
         }
         
+        .nav-controls {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .nav-controls label {
+            margin: 0;
+            font-weight: 500;
+            font-size: 0.85rem;
+            color: #ecf0f1;
+        }
+        
+        .nav-controls select {
+            width: auto;
+            margin: 0;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.85rem;
+            border-radius: 4px;
+            border: 1px solid #34495e;
+            background: #34495e;
+            color: #ecf0f1;
+            cursor: pointer;
+        }
+        
         .container {
-            max-width: 1200px;
+            /* Content width is driven by the --content-width CSS variable,
+               which is set from the width selector in the nav and persisted
+               in localStorage. Defaults to "standard" (1200px). */
+            max-width: var(--content-width, 1200px);
             margin: 1rem auto;
             padding: 0 1rem;
         }
@@ -258,6 +288,14 @@
             {% if password_protected %}
             <li><a href="/logout">Logout</a></li>
             {% endif %}
+            <li class="nav-controls">
+                <label for="width-selector">Width:</label>
+                <select id="width-selector">
+                    <option value="narrow">Narrow</option>
+                    <option value="standard">Standard</option>
+                    <option value="full">Full</option>
+                </select>
+            </li>
         </ul>
     </nav>
     
@@ -268,6 +306,30 @@
     {% block extra_scripts %}{% endblock %}
     
     <script>
+        // Width selector: persists choice in localStorage and applies it via
+        // the --content-width CSS variable on :root.
+        (function () {
+            var WIDTH_MAP = {
+                'narrow': '720px',
+                'standard': '1200px',
+                'full': 'none'
+            };
+            function applyWidth(value) {
+                var cssValue = WIDTH_MAP[value] || WIDTH_MAP['standard'];
+                document.documentElement.style.setProperty('--content-width', cssValue);
+            }
+            var sel = document.getElementById('width-selector');
+            if (sel) {
+                var saved = localStorage.getItem('qmd-width') || 'standard';
+                sel.value = saved;
+                applyWidth(saved);
+                sel.addEventListener('change', function () {
+                    localStorage.setItem('qmd-width', sel.value);
+                    applyWidth(sel.value);
+                    document.dispatchEvent(new CustomEvent('qmd:width-change', {detail: sel.value}));
+                });
+            }
+        })();
         {% block scripts %}{% endblock %}
     </script>
 </body>

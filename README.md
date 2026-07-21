@@ -9,6 +9,7 @@ A git submodule utility for maintaining a markdown notebook with both TUI and we
 - **Password Protection**: Optional password authentication for web access
 - **Configurable Title**: Customize your notebook's display name
 - **MathJax Support**: Write mathematical equations using `$` for inline math and `$$` for display equations
+- **Fully Offline Editor**: The web editor (CodeMirror 6 + Vim keybindings) and MathJax are vendored locally — no CDN calls, so editing and math rendering keep working with no internet connection
 - **Docker Support**: Run in a container with proper file ownership
 - Create and manage markdown pages with automatic date prefixing
 - Add images from screenshots directory with automatic copying and markdown link generation
@@ -26,7 +27,6 @@ Docker ensures all dependencies are properly installed and files are owned by yo
 
 #### Prerequisites
 - Docker
-- Docker Compose
 
 #### Quick Start
 
@@ -41,85 +41,74 @@ Docker ensures all dependencies are properly installed and files are owned by yo
    cd quick-md
    ```
 
-3. Build and run with Docker Compose:
+3. Build and run with the included launcher script:
    ```bash
-   # Set your user ID and group ID (ensures files are owned by you)
-   export USER_ID=$(id -u)
-   export GROUP_ID=$(id -g)
-   
-   # Build and start the container
-   docker compose up --build
+   ./run.sh
    ```
 
 4. Access the web interface at **http://localhost:6580**
 
+> The `run.sh` script uses `docker run` (no Docker Compose required), so you can
+> launch as many independent instances as you like — just give each one a unique
+> `--container` name and `--port`.
+>
 > **Note:** Docker runs in web-only mode (no TUI). For the TUI interface, use native installation.
 
-#### Docker Configuration Options
+#### `run.sh` Options
 
-**Run in Background:**
+```
+./run.sh [options]
+
+  -n, --notebook PATH       Notebook directory to mount (default: parent of this repo)
+  -p, --port PORT           Host port (default: 6580)
+  -c, --container NAME      Container name (default: quick_md_notebook)
+                             Override when running multiple instances.
+  --image NAME              Image name (default: quick-md)
+  --password PASSWORD       Enable password protection with this password.
+  --password-protect        Enable password protection (password read from
+                             --password, $QUICK_MD_PASSWORD, or a prompt).
+  --screenshots PATH        Read-only mount of a host screenshots directory.
+  --videos PATH             Read-only mount of a host videos directory.
+  --build                   Force a rebuild of the image.
+  -d, --detach              Run in the background.
+  -h, --help                Show help.
+```
+
+Most flags also have matching environment variables (`QUICK_MD_NOTEBOOK`,
+`QUICK_MD_PORT`, `QUICK_MD_CONTAINER`, `QUICK_MD_IMAGE`, `QUICK_MD_PASSWORD`,
+`USER_ID`, `GROUP_ID`) which act as defaults.
+
+#### Running Multiple Instances
+
 ```bash
-# Start detached (runs in background)
-docker compose up -d
+# First notebook on port 6580
+./run.sh -c quick_md_work       -p 6580 -n ~/notebooks/work
 
-# View logs
-docker compose logs -f
-
-# Stop when running in background
-docker compose down
+# Second notebook on port 6581
+./run.sh -c quick_md_personal   -p 6581 -n ~/notebooks/personal
 ```
 
-**Custom Port:**
+#### Running in the Background
+
 ```bash
-# Use a different port
-export PORT=8080
-docker compose up
+./run.sh -d                       # start detached
+docker logs -f quick_md_notebook  # follow logs
+docker stop quick_md_notebook     # stop
 ```
 
-**Password Protection:**
+#### Password Protection
 
-1. Create `.env` file from template:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Edit `.env` and add your password:
-   ```bash
-   QUICK_MD_PASSWORD=your_secure_password_here
-   ```
-
-3. Edit `docker-compose.yml` and uncomment the command line:
-   ```yaml
-   command: python3 main.py --web-only --port 6580 --password-protect
-   ```
-
-4. Start or restart the container:
-   ```bash
-   docker compose up -d
-   ```
-
-The password is passed via the `QUICK_MD_PASSWORD` environment variable (no interactive prompt needed in Docker).
-
-**Custom Notebook Location:**
-Edit the volumes section in `docker-compose.yml`:
-```yaml
-volumes:
-  - /path/to/your/notebook:/notebook
-```
-
-#### Stopping the Container
 ```bash
-# Stop the container
-docker compose down
-
-# Stop and remove volumes (removes all data - careful!)
-docker compose down -v
-
-# Restart after config changes
-docker compose restart
+./run.sh --password-protect                       # from $QUICK_MD_PASSWORD or prompt
+./run.sh --password-protect --password 's3cret'   # inline
 ```
 
-> See [DOCKER_QUICKSTART.md](DOCKER_QUICKSTART.md) for a quick reference guide.
+#### Migrating from docker-compose
+
+The old `docker-compose.yml` is kept for backward compatibility, but `run.sh`
+is now the recommended way to launch the container. Translate your compose
+settings into `run.sh` flags: port → `--port`, container name → `--container`,
+notebook volume → `--notebook`, password env → `--password-protect`.
 
 ### Option 2: Native Installation
 
@@ -198,11 +187,12 @@ Access the web interface at http://localhost:6580 in your browser (or your custo
 
 **Features:**
 - **View Pages**: Browse all markdown files with rendered preview (supports MathJax)
-- **Edit Pages**: Split-panel editor with live preview (MathJax renders in real-time)
+- **Edit Pages**: Split-panel editor with live preview (MathJax renders in real-time). Includes a persistent **media sidebar** for browsing/inserting images and videos, sorted by upload date, with grep-style filename search. Optional **Vim mode** (toggle in the editor header) powered by `@replit/codemirror-vim`.
+- **Content Width**: A width selector in the nav (Narrow / Standard / Full) controls how wide the reader and editor span — `Full` uses the whole window for maximum editor and preview space. The choice is remembered across sessions.
 - **Create Pages**: Web form to create new pages with custom titles
 - **Upload Images**: Drag-and-drop image upload with instant markdown link generation
 - **Upload Videos**: Video upload with processing options (resolution, compression via ffmpeg)
-- **Media Library**: Browse all images and videos with one-click markdown/HTML copying
+- **Media Library**: Browse all images and videos (sorted newest-first by upload date) with one-click markdown/HTML copying
 - **Math Support**: Write equations using `$...$` for inline and `$$...$$` for display equations
 - **Password Protection**: Optional authentication (see command line options)
 - **Custom Titles**: Both notebook title and individual page titles are configurable
@@ -271,6 +261,36 @@ global:
 - All paths in the `local` section are stored as **relative paths** and automatically resolved to absolute paths at runtime
 - Media paths (images/videos) are auto-detected based on where files are uploaded
 - The config file maintains backward compatibility with older formats
+
+## Vendored / Offline Assets
+
+The web editor and math rendering work with **no internet connection**. Their
+JavaScript is bundled and shipped locally under `static/js/` and served by
+Flask's built-in static route (`/static/...`), so there are no runtime CDN
+calls. This avoids the failure mode where a dropped connection breaks the
+editor.
+
+- `static/js/qmd-editor.js` — a single, minified ES module bundling
+  **CodeMirror 6**, `@replit/codemirror-vim` (Vim keybindings),
+  `@codemirror/lang-markdown`, and the One Dark theme. All CM6 core packages
+  are inlined into one file (CM6 requires a single shared copy of the core).
+- `static/js/mathjax-tex-svg.js` — MathJax 3 with the **SVG output renderer**
+  (chosen over CHTML because SVG needs no font files, making true offline use
+  trivial). The input config (`$...$` inline, `$$...$$` display) is unchanged.
+
+### Rebuilding the editor bundle
+
+The committed `static/js/qmd-editor.js` is produced from the entry in
+`vendor/qmd-editor.entry.js` by `vendor/build.sh` (uses `esbuild` via `npx`).
+You only need to run this if you want to change the editor packages or versions:
+
+```bash
+cd quick-md/vendor
+./build.sh      # requires node + npm; writes ../static/js/qmd-editor.js
+```
+
+`vendor/.build/` (node_modules) is gitignored; the generated bundle in
+`static/js/` is committed so normal users never need a build step.
 
 ## Architecture
 

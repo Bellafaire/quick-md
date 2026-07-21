@@ -3,6 +3,7 @@ import yaml
 import argparse
 import getpass
 from utils.configurations_manager import ConfigurationManager
+from utils.assets import ensure_vendored_assets
 from utils.menu import Menu
 
 def main():
@@ -28,6 +29,11 @@ def main():
             return
     
     configuration_manager = ConfigurationManager()
+    
+    # Make sure the offline web assets (CodeMirror 6 editor + MathJax) are
+    # present and up to date. No-op when the committed bundles are already in
+    # place; rebuilds/downloads only if missing or stale.
+    ensure_vendored_assets()
     
     if args.web_only:
         # Web-only mode: Start server and keep running
