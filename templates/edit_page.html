@@ -14,10 +14,11 @@
     .media-sidebar {
         width: 280px;
         flex-shrink: 0;
-        background: white;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        background: var(--c-surface);
+        color: var(--c-text);
+        border: 1px solid var(--c-border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
         display: flex;
         flex-direction: column;
         max-height: calc(100vh - 140px);
@@ -35,13 +36,14 @@
         justify-content: space-between;
         align-items: center;
         padding: 0.75rem 1rem;
-        border-bottom: 1px solid #eee;
+        border-bottom: 1px solid var(--c-border);
         flex-shrink: 0;
     }
 
     .sidebar-header h3 {
         margin: 0;
         font-size: 1rem;
+        color: var(--c-text);
     }
 
     .sidebar-icon-btn {
@@ -50,12 +52,12 @@
         cursor: pointer;
         font-size: 1.1rem;
         padding: 0.2rem 0.4rem;
-        color: #666;
+        color: var(--c-muted);
         border-radius: 4px;
     }
 
     .sidebar-icon-btn:hover {
-        background: #eee;
+        background: var(--c-active-line);
     }
 
     .sidebar-upload-buttons {
@@ -74,9 +76,11 @@
     .sidebar-search {
         margin: 0 1rem 0.5rem;
         padding: 0.5rem;
-        border: 1px solid #ddd;
+        border: 1px solid var(--c-border);
         border-radius: 4px;
         font-size: 0.9rem;
+        background: var(--c-base);
+        color: var(--c-text-on-base);
         width: calc(100% - 2rem);
     }
 
@@ -84,7 +88,7 @@
         display: flex;
         gap: 0.25rem;
         padding: 0 0.5rem;
-        border-bottom: 2px solid #eee;
+        border-bottom: 2px solid var(--c-border);
         flex-shrink: 0;
     }
 
@@ -94,14 +98,14 @@
         border: none;
         cursor: pointer;
         font-size: 0.85rem;
-        color: #666;
+        color: var(--c-muted);
         border-bottom: 3px solid transparent;
         margin-bottom: -2px;
     }
 
     .sidebar-tab.active {
-        color: #3498db;
-        border-bottom-color: #3498db;
+        color: var(--c-accent);
+        border-bottom-color: var(--c-accent);
         font-weight: 600;
     }
 
@@ -113,7 +117,7 @@
 
     .sidebar-media-empty {
         text-align: center;
-        color: #999;
+        color: var(--c-muted);
         font-size: 0.85rem;
         padding: 1.5rem 0.5rem;
     }
@@ -123,15 +127,15 @@
         align-items: center;
         gap: 0.5rem;
         padding: 0.5rem;
-        border: 1px solid #eee;
+        border: 1px solid var(--c-border);
         border-radius: 4px;
         margin-bottom: 0.5rem;
         transition: border-color 0.2s, background 0.2s;
     }
 
     .sidebar-media-item:hover {
-        border-color: #3498db;
-        background: #f8fafc;
+        border-color: var(--c-accent);
+        background: var(--c-active-line);
     }
 
     .sidebar-media-thumb {
@@ -140,7 +144,7 @@
         object-fit: cover;
         border-radius: 4px;
         flex-shrink: 0;
-        background: #eee;
+        background: var(--c-active-line);
     }
 
     .sidebar-media-info {
@@ -158,12 +162,12 @@
 
     .sidebar-media-date {
         font-size: 0.7rem;
-        color: #888;
+        color: var(--c-muted);
     }
 
     .sidebar-media-processing {
         font-size: 0.7rem;
-        color: #e67e22;
+        color: var(--c-warn);
         font-weight: 600;
         display: inline-flex;
         align-items: center;
@@ -175,7 +179,7 @@
         display: inline-block;
         width: 0.6rem;
         height: 0.6rem;
-        border: 2px solid #e67e22;
+        border: 2px solid var(--c-warn);
         border-top-color: transparent;
         border-radius: 50%;
         animation: qmd-spin 0.8s linear infinite;
@@ -186,13 +190,13 @@
         align-items: center;
         justify-content: center;
         font-size: 1.2rem;
-        color: #e67e22;
-        background: #fdf2e0;
+        color: var(--c-warn);
+        background: var(--c-warn-bg);
     }
 
     .sidebar-media-failed {
         font-size: 0.7rem;
-        color: #c0392b;
+        color: var(--c-err);
         font-weight: 600;
     }
 
@@ -201,8 +205,8 @@
         align-items: center;
         justify-content: center;
         font-size: 1.2rem;
-        color: #c0392b;
-        background: #fdecea;
+        color: var(--c-err);
+        background: var(--c-err-bg);
     }
 
     @keyframes qmd-spin {
@@ -210,9 +214,9 @@
     }
 
     .sidebar-media-insert {
-        background: #27ae60;
-        color: white;
-        border: none;
+        background: var(--c-accent);
+        color: var(--c-text-on-accent);
+        border: 1px solid var(--c-accent);
         padding: 0.3rem 0.5rem;
         border-radius: 4px;
         cursor: pointer;
@@ -221,7 +225,8 @@
     }
 
     .sidebar-media-insert:hover {
-        background: #219150;
+        background: var(--c-accent-hover);
+        border-color: var(--c-accent-hover);
     }
 
     #sidebar-show-btn {
@@ -291,7 +296,7 @@
     /* ---- CodeMirror 6 editor ---- */
     #codemirror-editor .cm-editor {
         height: 70vh;
-        border: 1px solid #ddd;
+        border: 1px solid var(--c-border);
         border-radius: 4px;
     }
 
@@ -328,11 +333,12 @@
     }
 
     #preview {
-        border: 1px solid #ddd;
+        border: 1px solid var(--c-border);
         border-radius: 4px;
         padding: 1rem;
         min-height: 400px;
-        background: white;
+        background: var(--c-surface);
+        color: var(--c-text);
         height: 70vh;
         overflow-y: auto;
     }
@@ -370,8 +376,10 @@
     }
 
     .upload-modal-content {
-        background: white;
-        border-radius: 8px;
+        background: var(--c-surface);
+        color: var(--c-text);
+        border: 1px solid var(--c-border);
+        border-radius: var(--radius);
         padding: 1.5rem;
         max-width: 580px;
         width: 90%;
@@ -387,21 +395,21 @@
 
     .upload-progress-bar-wrapper {
         height: 8px;
-        background: #e0e0e0;
+        background: var(--c-active-line);
         border-radius: 4px;
         overflow: hidden;
     }
 
     .upload-progress-bar {
         height: 100%;
-        background: #3498db;
+        background: var(--c-accent);
         border-radius: 4px;
         width: 0;
         transition: width 0.2s;
     }
 
     .upload-progress-bar.processing {
-        background: linear-gradient(90deg, #3498db 25%, #5dade2 50%, #3498db 75%);
+        background: linear-gradient(90deg, var(--c-accent) 25%, var(--c-accent-hover) 50%, var(--c-accent) 75%);
         background-size: 200% 100%;
         animation: shimmer 1.5s linear infinite;
         width: 100% !important;
@@ -415,7 +423,7 @@
 
     .upload-progress-label {
         font-size: 0.85rem;
-        color: #666;
+        color: var(--c-muted);
         margin-top: 0.25rem;
     }
 
@@ -476,7 +484,7 @@
                     <input type="checkbox" id="vim-mode-toggle">
                     <label for="vim-mode-toggle" style="margin: 0; cursor: pointer;">Enable Vim Mode</label>
                 </div>
-                <span id="autosave-status" style="color: #666; font-size: 0.85rem;">Auto-save enabled</span>
+                <span id="autosave-status" style="color: var(--c-muted); font-size: 0.85rem;">Auto-save enabled</span>
             </div>
 
             <!-- Hidden source for the initial document content -->
@@ -531,7 +539,7 @@
 
         <div id="upload-image-result" style="display: none; margin-top: 1rem;">
             <div id="upload-image-result-preview"></div>
-            <p id="upload-image-result-msg" style="color: #27ae60; margin-top: 0.5rem;"></p>
+            <p id="upload-image-result-msg" style="color: var(--c-ok); margin-top: 0.5rem;"></p>
         </div>
     </div>
 </div>
@@ -576,7 +584,7 @@
                 <div class="upload-progress-label" id="video-progress-label">Uploading…</div>
             </div>
 
-            <p style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;">
+            <p style="color: var(--c-muted); font-size: 0.9rem; margin-bottom: 1rem;">
                 <strong>Note:</strong> Once the upload finishes, the video appears in the media sidebar on the left (with a "Processing…" badge) and you can insert it into the page from there at any time. ffmpeg keeps compressing in the background — the video becomes playable once that completes. You can start another upload or keep editing in the meantime.
             </p>
 
@@ -585,7 +593,7 @@
 
         <div id="upload-video-result" style="display: none; margin-top: 1rem;">
             <div id="upload-video-result-preview"></div>
-            <p id="upload-video-result-msg" style="color: #27ae60; margin-top: 0.5rem;"></p>
+            <p id="upload-video-result-msg" style="color: var(--c-ok); margin-top: 0.5rem;"></p>
         </div>
     </div>
 </div>
@@ -597,8 +605,11 @@
 import {
     EditorView, basicSetup, EditorState, Compartment,
     keymap, defaultKeymap, indentWithTab,
-    markdown, oneDark, vim
+    markdown, syntaxHighlighting, HighlightStyle, tags, vim
 } from '/static/js/qmd-editor.js';
+
+// Theme palette injected from the server (utils/theme.py).
+const THEME = {{ theme_json|safe }};
 
 let view = null;
 const vimCompartment = new Compartment();
@@ -611,12 +622,48 @@ let currentSidebarTab = 'all';
 let previewTimeout = null;
 let mediaRefreshTimer = null;
 
+// ---- Editor theme (built from the configured palette) ----
+
+function editorTheme(c) {
+    return EditorView.theme({
+        "&": { backgroundColor: c.surface, color: c.text },
+        ".cm-content": { caretColor: c.accent, fontFamily: "'Courier New', 'Monaco', monospace" },
+        ".cm-scroller": { fontFamily: "'Courier New', 'Monaco', monospace", fontSize: "14px" },
+        ".cm-gutters": { backgroundColor: c.surface, color: c.gutter_text, border: "none" },
+        ".cm-activeLine": { backgroundColor: c.active_line },
+        ".cm-activeLineGutter": { backgroundColor: c.active_line, color: c.text },
+        ".cm-cursor, .cm-dropCursor": { borderLeftColor: c.accent },
+        "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": { backgroundColor: c.selection },
+        ".cm-panels": { backgroundColor: c.surface, color: c.text, borderTop: "1px solid " + c.border },
+        ".cm-panels.cm-panels-bottom": { backgroundColor: c.surface },
+        ".cm-vim-panel": { background: c.surface, color: c.text },
+        ".cm-searchMatch": { backgroundColor: c.selection },
+    });
+}
+
+function editorHighlightStyle(c) {
+    return syntaxHighlighting(HighlightStyle.define([
+        { tag: tags.heading, color: c.accent, fontWeight: "700" },
+        { tag: tags.strong, fontWeight: "700" },
+        { tag: tags.emphasis, fontStyle: "italic" },
+        { tag: tags.link, color: c.accent },
+        { tag: tags.url, color: c.accent },
+        { tag: tags.monospace, color: c.muted },
+        { tag: tags.quote, color: c.muted },
+        { tag: tags.list, color: c.accent },
+        { tag: tags.meta, color: c.muted },
+        { tag: tags.processingInstruction, color: c.muted },
+        { tag: tags.contentSeparator, color: c.accent },
+    ]));
+}
+
 // ---- Editor setup ----
 
 function buildExtensions() {
     return [
         basicSetup,
-        oneDark,
+        editorTheme(THEME),
+        editorHighlightStyle(THEME),
         markdown(),
         EditorView.lineWrapping,
         keymap.of([...defaultKeymap, indentWithTab]),
@@ -1052,7 +1099,7 @@ function updatePreview() {
     })
     .catch(error => {
         console.error('Error:', error);
-        document.getElementById('preview').innerHTML = '<p style="color: red;">Error generating preview</p>';
+        document.getElementById('preview').innerHTML = '<p style="color: var(--c-err);">Error generating preview</p>';
     });
 }
 
@@ -1080,8 +1127,8 @@ function saveContent(isAutoSave = false) {
             const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             if (isAutoSave) {
                 statusSpan.textContent = `✓ Auto-saved at ${timeStr}`;
-                statusSpan.style.color = '#27ae60';
-                setTimeout(() => { statusSpan.style.color = '#666'; }, 2000);
+                statusSpan.style.color = 'var(--c-ok)';
+                setTimeout(() => { statusSpan.style.color = 'var(--c-muted)'; }, 2000);
             } else {
                 showMessage(data.message);
                 statusSpan.textContent = `✓ Saved at ${timeStr}`;

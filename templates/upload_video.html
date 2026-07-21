@@ -41,13 +41,13 @@
         <div id="preview-container" style="margin-bottom: 1rem;"></div>
 
         <div id="progress-container" style="display:none; margin-bottom:1rem;">
-            <div style="height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;">
-                <div id="progress-bar" style="height:100%;background:#3498db;border-radius:4px;width:0;transition:width 0.2s;"></div>
+            <div style="height:8px;background:var(--c-active-line);border-radius:4px;overflow:hidden;">
+                <div id="progress-bar" style="height:100%;background:var(--c-accent);border-radius:4px;width:0;transition:width 0.2s;"></div>
             </div>
             <div id="progress-label" style="font-size:0.85rem;color:#666;margin-top:0.25rem;">Uploading…</div>
         </div>
 
-        <p style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;">
+        <p style="color: var(--c-muted); font-size: 0.9rem; margin-bottom: 1rem;">
             <strong>Note:</strong> The video tag is ready as soon as the upload finishes. ffmpeg compresses in the background, so the video becomes playable once processing completes.
         </p>
         
@@ -99,7 +99,7 @@ function uploadVideo(event) {
     submitBtn.textContent = 'Uploading…';
     progressContainer.style.display = 'block';
     progressBar.style.width = '0';
-    progressBar.style.background = '#3498db';
+    progressBar.style.background = 'var(--c-accent)';
     progressBar.style.backgroundSize = '';
     progressBar.style.animation = '';
     progressLabel.textContent = 'Uploading… 0%';
@@ -116,7 +116,7 @@ function uploadVideo(event) {
 
     xhr.upload.addEventListener('load', function() {
         progressBar.style.width = '100%';
-        progressBar.style.background = 'linear-gradient(90deg, #3498db 25%, #5dade2 50%, #3498db 75%)';
+        progressBar.style.background = 'linear-gradient(90deg, var(--c-accent) 25%, var(--c-accent-hover) 50%, var(--c-accent) 75%)';
         progressBar.style.backgroundSize = '200% 100%';
         progressBar.style.animation = 'shimmer 1.5s linear infinite';
         progressLabel.textContent = 'Finalizing upload…';
@@ -128,7 +128,7 @@ function uploadVideo(event) {
         submitBtn.textContent = 'Upload & Process Video';
         progressBar.style.animation = '';
         progressBar.style.backgroundSize = '';
-        progressBar.style.background = '#3498db';
+        progressBar.style.background = 'var(--c-accent)';
 
         if (xhr.status === 200) {
             let data;

@@ -49,6 +49,11 @@ class ConfigurationManager:
                 "images_dir": "~/Pictures/Screenshots/",
                 "videos_dir": "~/Videos"
             },
+            "theme": {
+                "base": "#f4f5f7",
+                "surface": "#ffffff",
+                "accent": "#3498db"
+            },
             "Images": [],
             "Videos": [],
             "Markdown": []
@@ -84,19 +89,22 @@ class ConfigurationManager:
         # Base path for resolving relative paths (directory containing config file)
         config_dir = os.path.dirname(self.config_path)
         
-        # Convert relative paths to absolute in self.config (working copy)
-        for section, options in self.config.items():
-            # Only process dictionary sections (local, global) for path substitution
-            if isinstance(options, dict):
-                for option, path in options.items():
-                    # Expand ~ and resolve relative to config file directory
-                    expanded_path = os.path.expanduser(path)
-                    if not os.path.isabs(expanded_path):
-                        abs_path = os.path.abspath(os.path.join(config_dir, expanded_path))
-                    else:
-                        abs_path = expanded_path
-                    abs_path = os.path.normpath(abs_path)
-                    self.config[section][option] = abs_path
+        # Convert relative paths to absolute in self.config (working copy).
+        # Only the local/global sections hold paths; other dict sections (e.g.
+        # theme) hold scalar values that must NOT be path-resolved.
+        for section in ('local', 'global'):
+            options = self.config.get(section)
+            if not isinstance(options, dict):
+                continue
+            for option, path in options.items():
+                # Expand ~ and resolve relative to the config file directory
+                expanded_path = os.path.expanduser(path)
+                if not os.path.isabs(expanded_path):
+                    abs_path = os.path.abspath(os.path.join(config_dir, expanded_path))
+                else:
+                    abs_path = expanded_path
+                abs_path = os.path.normpath(abs_path)
+                self.config[section][option] = abs_path
 
         main_md = self.config['local']['main_md']
         os.makedirs(os.path.dirname(main_md), exist_ok=True)

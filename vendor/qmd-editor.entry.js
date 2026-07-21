@@ -12,5 +12,6 @@ export { EditorState, Compartment } from "@codemirror/state";
 export { keymap } from "@codemirror/view";
 export { defaultKeymap, indentWithTab } from "@codemirror/commands";
 export { markdown } from "@codemirror/lang-markdown";
-export { oneDark } from "@codemirror/theme-one-dark";
+export { syntaxHighlighting, HighlightStyle } from "@codemirror/language";
+export { tags } from "@lezer/highlight";
 export { vim, getCM, Vim } from "@replit/codemirror-vim";

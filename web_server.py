@@ -5,9 +5,11 @@ import os
 import re
 import time
 import glob
+import json
 from functools import wraps
 from datetime import datetime
 from utils import image_handler, video_handler
+from utils.theme import resolve_theme
 
 class WebServer:
     def __init__(self, config_manager, host='0.0.0.0', port=5000, password=None):
@@ -168,9 +170,12 @@ class WebServer:
         @self.app.context_processor
         def inject_password_protected():
             notebook_title = self.config_manager.config.get('notebook_title', 'Quick-md Notebook')
+            theme = resolve_theme(self.config_manager.config.get('theme'))
             return {
                 'password_protected': self.password is not None,
-                'notebook_title': notebook_title
+                'notebook_title': notebook_title,
+                'theme': theme,
+                'theme_json': json.dumps(theme),
             }
         
         @self.app.route('/login', methods=['GET', 'POST'])

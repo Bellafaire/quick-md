@@ -10,6 +10,7 @@ A git submodule utility for maintaining a markdown notebook with both TUI and we
 - **Configurable Title**: Customize your notebook's display name
 - **MathJax Support**: Write mathematical equations using `$` for inline math and `$$` for display equations
 - **Fully Offline Editor**: The web editor (CodeMirror 6 + Vim keybindings) and MathJax are vendored locally — no CDN calls, so editing and math rendering keep working with no internet connection
+- **Configurable 3-Color Theme**: A 60/30/10 (base/surface/accent) theme configurable in `.qmd_conf`; text and borders auto-derive for any light or dark palette, and the editor matches
 - **Docker Support**: Run in a container with proper file ownership
 - Create and manage markdown pages with automatic date prefixing
 - Add images from screenshots directory with automatic copying and markdown link generation
@@ -256,6 +257,28 @@ global:
   images_dir: ~/Pictures/Screenshots/  # Default screenshots location
   videos_dir: ~/Videos                 # Default videos location
 ```
+
+**Theme (web interface):**
+
+The web UI uses a 3-color theme following a 60/30/10 rule. Only these three
+colors are configured; all other colors (text, borders, muted text, the editor
+chrome, etc.) are derived automatically so any palette — light or dark — stays
+readable.
+
+```yaml
+theme:
+  base: "#f4f5f7"    # 60% — page background
+  surface: "#ffffff"  # 30% — cards, nav, sidebar, editor chrome
+  accent: "#3498db"   # 10% — buttons, links, highlights, focus, the Insert button
+```
+
+- Omit the `theme:` section (or any color) to use the defaults shown above.
+- Each value is a hex color (`#rgb` or `#rrggbb`).
+- Text color on each surface is auto-picked by luminance, so a dark palette
+  (`base: "#1b1f24"`, `surface: "#262d36"`, …) gets light text automatically —
+  including the CodeMirror editor, which is themed to match at runtime.
+- Changing the file and reloading the page is enough (no restart needed beyond
+  the config being re-read on the next request).
 
 **Important Notes:**
 - All paths in the `local` section are stored as **relative paths** and automatically resolved to absolute paths at runtime

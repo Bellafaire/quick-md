@@ -6,7 +6,8 @@
 <style>
     .page-item {
         padding: 1rem;
-        background: #f8f9fa;
+        background: var(--c-active-line);
+        border: 1px solid var(--c-border);
         margin-bottom: 0.5rem;
         border-radius: 4px;
         display: flex;
@@ -15,11 +16,12 @@
         gap: 1rem;
         flex-wrap: wrap;
     }
-    
+
     .page-item-title {
         flex: 1;
         min-width: 150px;
         word-break: break-word;
+        color: var(--c-text);
     }
     
     .page-item-buttons {
