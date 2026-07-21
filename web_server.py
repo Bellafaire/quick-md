@@ -3,6 +3,8 @@ from flask import Flask, render_template, request, jsonify, send_from_directory,
 import markdown
 import os
 import re
+import time
+import glob
 from functools import wraps
 from datetime import datetime
 from utils import image_handler, video_handler
@@ -46,6 +48,58 @@ class WebServer:
                 return line[2:].strip()
         return None
 
+    def _parse_progress(self, progress_file, meta_file):
+        """Read ffmpeg -progress output + the duration sidecar and return
+        (percent, speed) for a currently-encoding video."""
+        duration = None
+        try:
+            if os.path.exists(meta_file):
+                with open(meta_file) as f:
+                    for line in f:
+                        if line.startswith('duration='):
+                            try:
+                                duration = float(line.split('=', 1)[1].strip())
+                            except ValueError:
+                                pass
+                            break
+        except OSError:
+            pass
+
+        out_time = None
+        speed = None
+        try:
+            if os.path.exists(progress_file):
+                with open(progress_file) as f:
+                    lines = f.read().splitlines()
+                # The file appends over time; take the latest of each key.
+                for line in reversed(lines):
+                    if out_time is None and line.startswith('out_time='):
+                        out_time = self._parse_hms(line.split('=', 1)[1].strip())
+                    elif speed is None and line.startswith('speed='):
+                        speed = line.split('=', 1)[1].strip()
+                    if out_time is not None and speed is not None:
+                        break
+        except OSError:
+            pass
+
+        percent = None
+        if duration and out_time is not None and duration > 0:
+            percent = min(99, max(0, int(round(out_time / duration * 100))))
+        return percent, speed
+
+    @staticmethod
+    def _parse_hms(s):
+        """Parse HH:MM:SS(.frac) into seconds (float), or None."""
+        parts = s.split(':')
+        try:
+            if len(parts) == 3:
+                return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+            if len(parts) == 2:
+                return int(parts[0]) * 60 + float(parts[1])
+            return float(parts[0])
+        except ValueError:
+            return None
+
     def _media_details(self, paths, is_video):
         """Build a list of media detail dicts sorted by upload date (newest first).
 
@@ -56,16 +110,54 @@ class WebServer:
         result = []
         for p in paths:
             full = os.path.join(md_path, p)
-            try:
-                mtime = os.path.getmtime(full)
-            except OSError:
-                mtime = 0
+            basename = os.path.basename(p)
+            directory = os.path.dirname(full)
+            exists = os.path.exists(full)
+            if exists:
+                try:
+                    mtime = os.path.getmtime(full)
+                except OSError:
+                    mtime = 0
+                processing = False
+                failed = False
+            else:
+                # File not on disk yet. Distinguish "actively encoding" from
+                # "failed/stale" by looking for the background process's
+                # working files: the raw upload (.<name>.upload_*) and the
+                # partial output (<name>.part*).
+                working = glob.glob(os.path.join(directory, '.' + basename + '.upload_*')) \
+                          + glob.glob(os.path.join(directory, basename + '.part*'))
+                if working:
+                    # Encode in progress -> treat as freshly uploaded so it
+                    # sorts to the top of the sidebar.
+                    processing = True
+                    failed = False
+                    mtime = time.time()
+                else:
+                    # Registered but no file and no working files -> the encode
+                    # failed or was interrupted. Sort to the bottom; flag it so
+                    # the UI can show "Failed" instead of "Processing…".
+                    processing = False
+                    failed = True
+                    mtime = 0
+            # For videos actively being encoded, surface live ffmpeg progress.
+            progress_percent = None
+            progress_speed = None
+            if processing and is_video:
+                progress_percent, progress_speed = self._parse_progress(
+                    video_handler.progress_file_for(full),
+                    video_handler.meta_file_for(full),
+                )
             result.append({
                 'path': p,
-                'filename': os.path.basename(p),
+                'filename': basename,
                 'timestamp': mtime,
-                'date': datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M') if mtime else 'unknown',
+                'date': datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M') if (exists and mtime) else 'unknown',
                 'is_video': is_video,
+                'processing': processing,
+                'failed': failed,
+                'progress_percent': progress_percent,
+                'progress_speed': progress_speed,
             })
         result.sort(key=lambda x: x['timestamp'], reverse=True)
         return result
@@ -269,41 +361,59 @@ class WebServer:
                 compression = request.form.get('compression', 'medium')
                 
                 original_ext = '.' + file.filename.rsplit('.', 1)[1].lower()
-                temp_filename = self.config_manager.sanitize_filename(title + "_temp", extension=original_ext)
                 filename = self.config_manager.sanitize_filename(title, extension=".webm")
                 
                 dest_directory = self.config_manager.config['local']['videos_path']
                 os.makedirs(dest_directory, exist_ok=True)
                 
-                temp_path = os.path.join(dest_directory, temp_filename)
-                file.save(temp_path)
-                
                 dest_path = os.path.join(dest_directory, filename)
                 
-                success, process_msg = video_handler.process_video_with_ffmpeg(
-                    temp_path, dest_path, resolution, compression, 
-                    output_extension=".webm", async_process=False
-                )
+                # Save the raw upload to a unique working file (hidden, random
+                # suffix) so multiple uploads can be processed concurrently
+                # without colliding. The background ffmpeg cleans this up.
+                import string as _string, random as _random
+                suffix = ''.join(_random.choices(_string.ascii_lowercase + _string.digits, k=8))
+                work_name = f".{filename}.upload_{suffix}{original_ext}"
+                work_path = os.path.join(dest_directory, work_name)
+                file.save(work_path)
                 
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
+                # Probe the source duration up front so the sidebar can show a
+                # live encode percentage (out_time / duration). Write it to a
+                # per-job meta sidecar; the background ffmpeg cleans it up.
+                duration = video_handler.get_video_duration(work_path)
+                if duration:
+                    try:
+                        with open(video_handler.meta_file_for(dest_path), "w") as mf:
+                            mf.write(f"duration={duration}\n")
+                    except OSError:
+                        pass
                 
-                if not success:
-                    return jsonify({'success': False, 'message': process_msg})
-                
-                # Auto-detect relative path
+                # Register the final path in the config *now* so it shows up in
+                # the media sidebar immediately and can be inserted at will.
                 md_path = self.config_manager.config['local']['md_path']
                 relative_dir = os.path.relpath(dest_directory, md_path)
                 relative_path = f"{relative_dir}/{filename}"
                 self.config_manager.add_video_to_config(relative_path)
                 
+                # Kick off ffmpeg in the background; return immediately so the
+                # user can keep editing / start another upload. The video will
+                # only be playable once the background encode finishes.
+                success, process_msg = video_handler.process_video_with_ffmpeg(
+                    work_path, dest_path, resolution, compression, 
+                    output_extension=".webm", async_process=True,
+                )
+                
+                if not success:
+                    return jsonify({'success': False, 'message': process_msg})
+                
                 video_tag = video_handler.create_video_html_tag(relative_path, width="640")
                 
                 return jsonify({
                     'success': True, 
-                    'message': 'Video uploaded and processed successfully',
+                    'message': 'Upload complete. Video is processing in the background; it will appear once ready.',
                     'video_tag': video_tag,
-                    'relative_path': relative_path
+                    'relative_path': relative_path,
+                    'processing': True,
                 })
             
             return render_template('upload_video.html')

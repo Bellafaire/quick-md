@@ -161,6 +161,54 @@
         color: #888;
     }
 
+    .sidebar-media-processing {
+        font-size: 0.7rem;
+        color: #e67e22;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .sidebar-media-processing::before {
+        content: "";
+        display: inline-block;
+        width: 0.6rem;
+        height: 0.6rem;
+        border: 2px solid #e67e22;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: qmd-spin 0.8s linear infinite;
+    }
+
+    .sidebar-media-thumb-processing {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        color: #e67e22;
+        background: #fdf2e0;
+    }
+
+    .sidebar-media-failed {
+        font-size: 0.7rem;
+        color: #c0392b;
+        font-weight: 600;
+    }
+
+    .sidebar-media-thumb-failed {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        color: #c0392b;
+        background: #fdecea;
+    }
+
+    @keyframes qmd-spin {
+        to { transform: rotate(360deg); }
+    }
+
     .sidebar-media-insert {
         background: #27ae60;
         color: white;
@@ -503,7 +551,7 @@
             <input type="text" id="modal-video-title" name="title" placeholder="Enter video title" required>
 
             <label for="modal-video-file">Select Video:</label>
-            <input type="file" id="modal-video-file" name="file" accept="video/*" required>
+            <input type="file" id="modal-video-file" name="file" accept="video/*,.mp4,.m4v,.mov,.webm,.mkv,.avi,.wmv,.flv,.ogv,.ogg,.mpg,.mpeg,.mpe,.3gp,.3g2,.ts,.m2ts,.mts,.vob,.rm,.rmvb,.asf,.f4v,.dv,.y4m" required>
 
             <label for="modal-video-resolution">Resolution:</label>
             <select id="modal-video-resolution" name="resolution">
@@ -529,7 +577,7 @@
             </div>
 
             <p style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;">
-                <strong>Note:</strong> Video processing may take some time after upload completes.
+                <strong>Note:</strong> Once the upload finishes, the video appears in the media sidebar on the left (with a "Processing…" badge) and you can insert it into the page from there at any time. ffmpeg keeps compressing in the background — the video becomes playable once that completes. You can start another upload or keep editing in the meantime.
             </p>
 
             <button type="submit" class="btn" id="upload-video-btn">Upload &amp; Process Video</button>
@@ -561,6 +609,7 @@ let lastSavedContent = '';
 let autoSaveInterval = null;
 let currentSidebarTab = 'all';
 let previewTimeout = null;
+let mediaRefreshTimer = null;
 
 // ---- Editor setup ----
 
@@ -673,12 +722,26 @@ function loadMedia() {
         .then(data => {
             mediaData = data;
             renderSidebarMedia();
+            scheduleProcessingRefresh();
         })
         .catch(error => {
             console.error('Error loading media:', error);
             document.getElementById('media-list').innerHTML =
                 '<div class="sidebar-media-empty">Error loading media</div>';
         });
+}
+
+// While any media item is still being encoded (ffmpeg running in the
+// background), poll the server frequently so the live progress percentage
+// updates and the "Processing…" badge clears the moment the file appears.
+function scheduleProcessingRefresh() {
+    if (mediaRefreshTimer) return;
+    const items = mediaData.images.concat(mediaData.videos);
+    if (!items.some(i => i.processing)) return;
+    mediaRefreshTimer = setTimeout(() => {
+        mediaRefreshTimer = null;
+        loadMedia();
+    }, 1000);
 }
 
 function getFilteredMedia() {
@@ -709,15 +772,34 @@ function renderSidebarMedia() {
     }
 
     container.innerHTML = items.map(item => {
-        const thumb = item.is_video
-            ? `<video src="/media/${item.path}" class="sidebar-media-thumb" muted preload="metadata"></video>`
-            : `<img src="/media/${item.path}" class="sidebar-media-thumb" alt="${item.filename}">`;
+        const processing = !!item.processing;
+        const failed = !!item.failed;
+        let thumb, statusLine;
+        if (processing) {
+            thumb = `<div class="sidebar-media-thumb sidebar-media-thumb-processing">⏳</div>`;
+            const pct = item.progress_percent;
+            const speed = item.progress_speed;
+            let label = 'Processing…';
+            if (pct != null) {
+                label = `Processing… ${pct}%`;
+                if (speed) label += ` (${speed})`;
+            }
+            statusLine = `<div class="sidebar-media-processing">${label}</div>`;
+        } else if (failed) {
+            thumb = `<div class="sidebar-media-thumb sidebar-media-thumb-failed">✕</div>`;
+            statusLine = `<div class="sidebar-media-failed">Failed (encode error)</div>`;
+        } else {
+            thumb = item.is_video
+                ? `<video src="/media/${item.path}" class="sidebar-media-thumb" muted preload="metadata"></video>`
+                : `<img src="/media/${item.path}" class="sidebar-media-thumb" alt="${item.filename}">`;
+            statusLine = `<div class="sidebar-media-date">${item.date}</div>`;
+        }
         return `
             <div class="sidebar-media-item">
                 ${thumb}
                 <div class="sidebar-media-info">
                     <div class="sidebar-media-filename" title="${item.filename}">${item.filename}</div>
-                    <div class="sidebar-media-date">${item.date}</div>
+                    ${statusLine}
                 </div>
                 <button class="sidebar-media-insert" data-path="${item.path}" data-is-image="${!item.is_video}">Insert</button>
             </div>
@@ -901,8 +983,8 @@ function uploadVideoFromModal(event) {
 
     xhr.upload.addEventListener('load', function() {
         progressBar.classList.add('processing');
-        progressLabel.textContent = 'Processing video… this may take a while';
-        submitBtn.textContent = 'Processing…';
+        progressLabel.textContent = 'Finalizing upload…';
+        submitBtn.textContent = 'Finishing…';
     });
 
     xhr.addEventListener('load', function() {
@@ -916,16 +998,13 @@ function uploadVideoFromModal(event) {
 
             if (data.success) {
                 progressBar.style.width = '100%';
-                progressLabel.textContent = 'Processing complete!';
+                progressLabel.textContent = 'Upload complete — processing in background';
 
-                document.getElementById('upload-video-result-preview').innerHTML =
-                    '<video controls style="max-width:100%;max-height:200px;border-radius:4px;margin-bottom:0.5rem;"><source src="/media/' + data.relative_path + '" type="video/webm"></video>';
-                document.getElementById('upload-video-result-msg').textContent = data.message;
-                document.getElementById('upload-video-result').style.display = 'block';
-
-                insertMedia(data.relative_path, false);
+                // The video is now in the media sidebar (with a "Processing…"
+                // badge); the user inserts it via the sidebar's Insert button
+                // whenever they want. No automatic tag insertion.
                 loadMedia();
-                setTimeout(closeUploadVideoModal, 1500);
+                setTimeout(closeUploadVideoModal, 1200);
             } else {
                 showUploadMessage('upload-video-message', data.message, true);
                 progressContainer.style.display = 'none';

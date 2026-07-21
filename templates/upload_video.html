@@ -22,7 +22,7 @@
         <input type="text" id="title" name="title" placeholder="Enter video title" required>
         
         <label for="file">Select Video:</label>
-        <input type="file" id="file" name="file" accept="video/*" required>
+        <input type="file" id="file" name="file" accept="video/*,.mp4,.m4v,.mov,.webm,.mkv,.avi,.wmv,.flv,.ogv,.ogg,.mpg,.mpeg,.mpe,.3gp,.3g2,.ts,.m2ts,.mts,.vob,.rm,.rmvb,.asf,.f4v,.dv,.y4m" required>
         
         <label for="resolution">Resolution:</label>
         <select id="resolution" name="resolution">
@@ -48,7 +48,7 @@
         </div>
 
         <p style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;">
-            <strong>Note:</strong> Video processing may take some time depending on file size and compression settings.
+            <strong>Note:</strong> The video tag is ready as soon as the upload finishes. ffmpeg compresses in the background, so the video becomes playable once processing completes.
         </p>
         
         <button type="submit" class="btn" id="submit-btn">Upload &amp; Process Video</button>
@@ -119,8 +119,8 @@ function uploadVideo(event) {
         progressBar.style.background = 'linear-gradient(90deg, #3498db 25%, #5dade2 50%, #3498db 75%)';
         progressBar.style.backgroundSize = '200% 100%';
         progressBar.style.animation = 'shimmer 1.5s linear infinite';
-        progressLabel.textContent = 'Processing video… this may take a while';
-        submitBtn.textContent = 'Processing…';
+        progressLabel.textContent = 'Finalizing upload…';
+        submitBtn.textContent = 'Finishing…';
     });
 
     xhr.addEventListener('load', function() {
@@ -136,10 +136,10 @@ function uploadVideo(event) {
 
             if (data.success) {
                 progressBar.style.width = '100%';
-                progressLabel.textContent = 'Processing complete!';
+                progressLabel.textContent = 'Upload complete — processing in background';
                 videoTagText = data.video_tag;
                 document.getElementById('result-preview').innerHTML = 
-                    '<video controls style="max-width: 100%; max-height: 300px; border-radius: 4px; margin-bottom: 1rem;"><source src="/media/' + data.relative_path + '" type="video/mp4"></video>';
+                    '<video controls style="max-width: 100%; max-height: 300px; border-radius: 4px; margin-bottom: 1rem;"><source src="/media/' + data.relative_path + '" type="video/webm"></video>';
                 document.getElementById('video-tag').textContent = data.video_tag;
                 document.getElementById('result-card').style.display = 'block';
                 event.target.reset();
