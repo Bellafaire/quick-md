@@ -69,7 +69,7 @@ while [[ $# -gt 0 ]]; do
         -p|--port)          PORT="$2"; shift 2 ;;
         -c|--container)     CONTAINER="$2"; shift 2 ;;
         --image)            IMAGE="$2"; shift 2 ;;
-        --password)         PASSWORD="$2"; shift 2 ;;
+        --password)         PASSWORD="$2"; PASSWORD_PROTECT=1; shift 2 ;;
         --password-protect) PASSWORD_PROTECT=1; shift ;;
         --screenshots)      SCREENSHOTS="$2"; shift 2 ;;
         --videos)           VIDEOS="$2"; shift 2 ;;
