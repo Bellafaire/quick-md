@@ -125,6 +125,23 @@
             cursor: pointer;
         }
 
+        .nav-controls input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .nav-controls .vim-nav-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-weight: 500;
+            font-size: 0.85rem;
+            color: var(--c-muted);
+            cursor: pointer;
+            user-select: none;
+        }
+
         .container {
             max-width: var(--content-width);
             margin: 1rem auto;
@@ -380,6 +397,9 @@
             <li><a href="/logout">Logout</a></li>
             {% endif %}
             <li class="nav-controls">
+                <label class="vim-nav-toggle" for="vim-mode-toggle" title="Toggle Vim keybindings in the editor">
+                    <input type="checkbox" id="vim-mode-toggle"> Vim
+                </label>
                 <label for="width-selector">Width:</label>
                 <select id="width-selector">
                     <option value="narrow">Narrow</option>
@@ -418,6 +438,20 @@
                     localStorage.setItem('qmd-width', sel.value);
                     applyWidth(sel.value);
                     document.dispatchEvent(new CustomEvent('qmd:width-change', {detail: sel.value}));
+                });
+            }
+        })();
+
+        // Vim mode toggle (lives in the nav bar). Persisted in localStorage
+        // so the choice survives across sessions and pages; the editor page
+        // listens for the `qmd:vim-change` event to reconfigure CodeMirror.
+        (function () {
+            var vimCb = document.getElementById('vim-mode-toggle');
+            if (vimCb) {
+                vimCb.checked = localStorage.getItem('vimModeEnabled') === 'true';
+                vimCb.addEventListener('change', function () {
+                    localStorage.setItem('vimModeEnabled', String(vimCb.checked));
+                    document.dispatchEvent(new CustomEvent('qmd:vim-change', {detail: vimCb.checked}));
                 });
             }
         })();
