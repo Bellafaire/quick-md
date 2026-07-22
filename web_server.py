@@ -16,7 +16,7 @@ from utils.theme import resolve_theme
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class WebServer:
-    def __init__(self, config_manager, host='0.0.0.0', port=5000, password=None):
+    def __init__(self, config_manager, host='127.0.0.1', port=5000, password=None):
         self.config_manager = config_manager
         self.host = host
         self.port = port

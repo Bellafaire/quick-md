@@ -159,12 +159,14 @@ Solution: `_fix_media_paths()` converts to `/media/images/file.png` for web serv
 - **Port configuration** - `-p` or `--port` flag (default: 6580)
 - **Password protection** - `--password-protect` flag enables authentication
 - **Web-only mode** - `--web-only` flag is accepted for backward compatibility (the web server is always started)
+- **Network exposure** - `--network` flag binds to 0.0.0.0 so the notebook is reachable over the network; default is localhost only (127.0.0.1)
 - **Password via environment** - `QUICK_MD_PASSWORD` env var for non-interactive setups
 - **Examples**:
   - `python3 main.py -p 8080`
   - `python3 main.py --password-protect` (interactive prompt)
   - `export QUICK_MD_PASSWORD=secret && python3 main.py --password-protect` (Docker)
   - `python3 main.py --web-only --port 6580` (headless server)
+  - `python3 main.py --network` (expose on the network)
 
 #### Responsive Button Layout
 - `.page-header` - Flex container for title and buttons
@@ -201,7 +203,7 @@ Solution: `_fix_media_paths()` converts to `/media/images/file.png` for web serv
 
 ```
 quick-md/
-├── main.py                 # Entry point with arg parsing (--port, --password-protect, --web-only)
+├── main.py                 # Entry point with arg parsing (--port, --password-protect, --web-only, --network)
 ├── web_server.py           # Flask server with authentication and title extraction
 ├── requirements.txt        # Python dependencies
 ├── agents.md              # Development guidelines (this file)

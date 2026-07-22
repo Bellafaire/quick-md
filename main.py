@@ -12,6 +12,8 @@ def main():
                         help='Enable password protection for the web server')
     parser.add_argument('--web-only', action='store_true',
                         help='Accepted for backward compatibility (the web server is always started)')
+    parser.add_argument('--network', action='store_true',
+                        help='Bind to all interfaces (0.0.0.0) so the notebook is reachable over the network. Default: localhost only (127.0.0.1).')
     args = parser.parse_args()
 
     password = None
@@ -34,10 +36,13 @@ def main():
     ensure_vendored_assets()
 
     from web_server import WebServer
-    print(f"Starting Quick-md web server on port {args.port}...")
+    host = '0.0.0.0' if args.network else '127.0.0.1'
+    print(f"Starting Quick-md web server on {host}:{args.port}...")
     if password:
         print("Password protection enabled")
-    server = WebServer(configuration_manager, port=args.port, password=password)
+    if not args.network:
+        print("(localhost only — pass --network to expose on the network)")
+    server = WebServer(configuration_manager, host=host, port=args.port, password=password)
     server.start()
     print(f"Web server running at {server.get_address()}")
     print("Press Ctrl+C to stop")

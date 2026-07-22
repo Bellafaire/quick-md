@@ -36,5 +36,8 @@ EXPOSE 6580
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 
-# Default command (can be overridden in docker-compose or docker run)
-CMD ["python3", "main.py", "--web-only"]
+# Default command (can be overridden in docker-compose or docker run).
+# --network binds the Flask server to 0.0.0.0 *inside* the container, which
+# is required for Docker port forwarding to reach it. Host-side exposure is
+# controlled by the -p port mapping in run.sh / docker-compose.
+CMD ["python3", "main.py", "--web-only", "--network"]

@@ -71,6 +71,9 @@ Docker ensures all dependencies are properly installed and files are owned by yo
                              --password, $QUICK_MD_PASSWORD, or a prompt).
   --screenshots PATH        Read-only mount of a host screenshots directory.
   --videos PATH             Read-only mount of a host videos directory.
+  --network                 Expose on the network (bind host port to 0.0.0.0).
+                             By default the notebook is only reachable from the
+                             host machine (127.0.0.1).
   --build                   Force a rebuild of the image.
   -d, --detach              Run in the background.
   -h, --help                Show help.
@@ -78,7 +81,7 @@ Docker ensures all dependencies are properly installed and files are owned by yo
 
 Most flags also have matching environment variables (`QUICK_MD_NOTEBOOK`,
 `QUICK_MD_PORT`, `QUICK_MD_CONTAINER`, `QUICK_MD_IMAGE`, `QUICK_MD_PASSWORD`,
-`USER_ID`, `GROUP_ID`) which act as defaults.
+`QUICK_MD_NETWORK`, `USER_ID`, `GROUP_ID`) which act as defaults.
 
 #### Running Multiple Instances
 
@@ -140,7 +143,7 @@ notebook volume → `--notebook`, password env → `--password-protect`.
    python3 main.py
    ```
 
-The web server will start automatically (default: http://0.0.0.0:6580).
+The web server will start automatically and is reachable at **http://localhost:6580** (localhost only by default).
 
 ### Command Line Options
 
@@ -157,12 +160,16 @@ python3 main.py --password-protect
 
 # Combine options
 python3 main.py --port 8080 --password-protect
+
+# Expose on the network (reachable from other machines)
+python3 main.py --network
 ```
 
 **Available Options:**
 - `--port PORT`: Specify web server port (default: 6580)
 - `--password-protect`: Enable password authentication for web access
 - `--web-only`: Accepted for backward compatibility (the web server is always started)
+- `--network`: Bind to all interfaces (0.0.0.0) so the notebook is reachable over the network. By default the server binds to localhost (127.0.0.1) only.
 
 **Password Methods:**
 1. **Interactive**: Run with `--password-protect` and enter password when prompted

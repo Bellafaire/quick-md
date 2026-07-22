@@ -26,6 +26,9 @@
 #                             prompt.
 #   --screenshots PATH        Optional read-only mount of a host screenshots dir.
 #   --videos PATH             Optional read-only mount of a host videos dir.
+#   --network                 Expose the notebook on the network (binds the
+#                             host port to 0.0.0.0). By default it is only
+#                             reachable from the host machine (127.0.0.1).
 #   --build                   Force a rebuild of the image before starting.
 #   -d, --detach              Run in the background (detached).
 #   --image NAME              Image name to build/use. Default "quick-md".
@@ -37,6 +40,7 @@
 #   QUICK_MD_CONTAINER        Container name
 #   QUICK_MD_IMAGE            Image name
 #   QUICK_MD_PASSWORD         Password (when --password-protect is set)
+#   QUICK_MD_NETWORK          Set to 1 to expose on the network (same as --network)
 #   USER_ID / GROUP_ID        UID/GID to build/run as (default: id -u / id -g)
 
 set -euo pipefail
@@ -56,6 +60,7 @@ SCREENSHOTS=""
 VIDEOS=""
 FORCE_BUILD=0
 DETACH=0
+NETWORK="${QUICK_MD_NETWORK:-0}"
 
 usage() {
     grep '^#' "$0" | sed '1d; s/^# \{0,1\}//'
@@ -73,6 +78,7 @@ while [[ $# -gt 0 ]]; do
         --password-protect) PASSWORD_PROTECT=1; shift ;;
         --screenshots)      SCREENSHOTS="$2"; shift 2 ;;
         --videos)           VIDEOS="$2"; shift 2 ;;
+        --network)          NETWORK=1; shift ;;
         --build)            FORCE_BUILD=1; shift ;;
         -d|--detach)        DETACH=1; shift ;;
         -h|--help)          usage ;;
@@ -124,9 +130,20 @@ if docker ps -a --format '{{.Names}}' | grep -qx "$CONTAINER"; then
 fi
 
 # ---- Assemble the docker run command ----
+# The host-side port binding controls whether the notebook is reachable only
+# from the host (127.0.0.1, default) or over the network (0.0.0.0, --network).
+# The app inside the container always binds 0.0.0.0 (--network passed below)
+# because Docker port forwarding can't reach a process listening on the
+# container's loopback.
+if [[ "$NETWORK" == "1" ]]; then
+    PORT_BINDING="${PORT}:6580"
+else
+    PORT_BINDING="127.0.0.1:${PORT}:6580"
+fi
+
 RUN_ARGS=(
     --name "$CONTAINER"
-    -p "${PORT}:6580"
+    -p "$PORT_BINDING"
     -v "${NOTEBOOK}:/notebook"
     -e "PORT=${PORT}"
     --restart unless-stopped
@@ -149,8 +166,14 @@ else
     RUN_ARGS+=( -it )
 fi
 
-# Application command inside the container
-RUN_ARGS+=( "$IMAGE" python3 main.py --web-only --port 6580 $PASSWORD_FLAG )
+# Application command inside the container. --network is always passed so
+# Flask binds 0.0.0.0 inside the container (required for port forwarding);
+# the host-side exposure is governed by the -p mapping above.
+RUN_ARGS+=( "$IMAGE" python3 main.py --web-only --network --port 6580 $PASSWORD_FLAG )
 
-echo "Starting container '$CONTAINER' on host port ${PORT} (notebook: ${NOTEBOOK})..."
+if [[ "$NETWORK" == "1" ]]; then
+    echo "Starting container '$CONTAINER' on host port ${PORT} (network-exposed, notebook: ${NOTEBOOK})..."
+else
+    echo "Starting container '$CONTAINER' on host port ${PORT} (localhost only, notebook: ${NOTEBOOK})..."
+fi
 docker run "${RUN_ARGS[@]}"

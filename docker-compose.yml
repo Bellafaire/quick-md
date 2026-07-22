@@ -17,7 +17,10 @@ services:
         GROUP_ID: ${GROUP_ID:-1000}
     container_name: ${QUICK_MD_CONTAINER_NAME:-quick_md_notebook}
     ports:
-      - "${PORT:-6580}:6580"
+      # By default the notebook is only reachable from the host machine
+      # (bound to 127.0.0.1). To expose it on the network, change this to
+      #   "${PORT:-6580}:6580"
+      - "127.0.0.1:${PORT:-6580}:6580"
     volumes:
       # Mount your notebook directory
       # Change the left side to your actual notebook path
@@ -31,10 +34,12 @@ services:
       # Optional: Set password for web server (requires --password-protect in command)
       - QUICK_MD_PASSWORD=${QUICK_MD_PASSWORD:-}
     # Override command to pass arguments
-    # Default is web-only mode with port 6580
+    # Default is web-only mode with port 6580. --network binds 0.0.0.0 inside
+    # the container (required for port forwarding); host exposure is controlled
+    # by the `ports:` mapping above.
     # To enable password protection, set QUICK_MD_PASSWORD in .env and add --password-protect:
-    # command: python3 main.py --web-only --port 6580 --password-protect
-    command: python3 main.py --web-only --port 6580
+    # command: python3 main.py --web-only --network --port 6580 --password-protect
+    command: python3 main.py --web-only --network --port 6580
     stdin_open: true
     tty: true
     restart: unless-stopped
