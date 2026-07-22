@@ -120,8 +120,8 @@
             font-size: 0.85rem;
             border-radius: 4px;
             border: 1px solid var(--c-border);
-            background: var(--c-base);
-            color: var(--c-text-on-base);
+            background: var(--c-surface);
+            color: var(--c-text);
             cursor: pointer;
         }
 
@@ -156,8 +156,8 @@
             font-size: 0.85rem;
             border-radius: 4px;
             border: 1px solid var(--c-border);
-            background: var(--c-base);
-            color: var(--c-text-on-base);
+            background: var(--c-surface);
+            color: var(--c-text);
         }
 
         .nav-search button {
@@ -214,15 +214,26 @@
         }
 
         /* ---- Form controls ---- */
-        input[type="text"], input[type="password"], input[type="file"], textarea, select {
+        input[type="text"], input[type="password"], input[type="file"], input[type="search"], textarea {
             width: 100%;
             padding: 0.75rem;
             border: 1px solid var(--c-border);
             border-radius: 4px;
             font-size: 1rem;
             margin-bottom: 1rem;
-            background: var(--c-base);
-            color: var(--c-text-on-base);
+            background: var(--c-surface);
+            color: var(--c-text);
+        }
+
+        select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--c-border);
+            border-radius: 4px;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            background: var(--c-surface);
+            color: var(--c-text);
         }
 
         input:focus, textarea:focus, select:focus {
