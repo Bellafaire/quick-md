@@ -11,6 +11,10 @@ from datetime import datetime
 from utils import image_handler, video_handler, drawio_handler
 from utils.theme import resolve_theme
 
+# Absolute path to this application's own directory (the quick-md/ folder).
+# Used to keep search / page listings from indexing the app's own docs.
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
 class WebServer:
     def __init__(self, config_manager, host='0.0.0.0', port=5000, password=None):
         self.config_manager = config_manager
@@ -49,6 +53,63 @@ class WebServer:
             if line.startswith('# '):
                 return line[2:].strip()
         return None
+
+    def _snippets(self, content, qlower, max_snippets=3, radius=60):
+        """Return up to `max_snippets` non-overlapping context snippets around matches of qlower."""
+        snippets = []
+        clower = content.lower()
+        idx = 0
+        while len(snippets) < max_snippets:
+            pos = clower.find(qlower, idx)
+            if pos == -1:
+                break
+            start = max(0, pos - radius)
+            end = min(len(content), pos + len(qlower) + radius)
+            snippet = content[start:end].replace('\n', ' ').strip()
+            prefix = '…' if start > 0 else ''
+            suffix = '…' if end < len(content) else ''
+            snippets.append(prefix + snippet + suffix)
+            # Skip past this snippet's window so the next snippet doesn't overlap it.
+            idx = end
+        return snippets
+
+    def _search_markdown(self, query):
+        """Full-text search across every .md file under md_path.
+
+        Returns a list of dicts sorted by relevance (title hits weighted
+        higher than body hits), each with filename, title, hit counts, and
+        context snippets."""
+        md_path = self.config_manager.config['local']['md_path']
+        qlower = query.lower()
+        results = []
+        for root, dirs, files in os.walk(md_path):
+            # Don't descend into the application's own directory.
+            dirs[:] = [d for d in dirs if os.path.abspath(os.path.join(root, d)) != APP_DIR]
+            for name in files:
+                if not name.endswith('.md'):
+                    continue
+                filepath = os.path.join(root, name)
+                rel = os.path.relpath(filepath, md_path)
+                try:
+                    with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+                        content = f.read()
+                except OSError:
+                    continue
+                title = self._extract_title_from_markdown(content) or name
+                title_hits = title.lower().count(qlower)
+                body_hits = content.lower().count(qlower)
+                if title_hits == 0 and body_hits == 0:
+                    continue
+                results.append({
+                    'filename': rel,
+                    'title': title,
+                    'title_hits': title_hits,
+                    'body_hits': body_hits,
+                    'score': title_hits * 10 + body_hits,
+                    'snippets': self._snippets(content, qlower),
+                })
+        results.sort(key=lambda r: (-r['score'], r['title'].lower()))
+        return results
 
     def _parse_progress(self, progress_file, meta_file):
         """Read ffmpeg -progress output + the duration sidecar and return
@@ -101,6 +162,40 @@ class WebServer:
             return float(parts[0])
         except ValueError:
             return None
+
+    def _page_details(self):
+        """Build a list of markdown pages (newest first by mtime) for the
+        editor sidebar's Pages tab."""
+        md_path = self.config_manager.config['local']['md_path']
+        result = []
+        for root, dirs, files in os.walk(md_path):
+            # Don't descend into the application's own directory.
+            dirs[:] = [d for d in dirs if os.path.abspath(os.path.join(root, d)) != APP_DIR]
+            for name in files:
+                if not name.endswith('.md'):
+                    continue
+                filepath = os.path.join(root, name)
+                rel = os.path.relpath(filepath, md_path)
+                try:
+                    mtime = os.path.getmtime(filepath)
+                except OSError:
+                    mtime = 0
+                try:
+                    with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+                        content = f.read()
+                except OSError:
+                    content = ''
+                title = self._extract_title_from_markdown(content) or name
+                result.append({
+                    'path': rel,
+                    'filename': name,
+                    'title': title,
+                    'timestamp': mtime,
+                    'date': datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M') if mtime else 'unknown',
+                    'is_page': True,
+                })
+        result.sort(key=lambda x: x['timestamp'], reverse=True)
+        return result
 
     def _media_details(self, paths, is_video):
         """Build a list of media detail dicts sorted by upload date (newest first).
@@ -423,6 +518,13 @@ class WebServer:
             
             return render_template('upload_video.html')
         
+        @self.app.route('/search')
+        @self._check_password
+        def search():
+            q = request.args.get('q', '').strip()
+            results = self._search_markdown(q) if q else []
+            return render_template('search.html', query=q, results=results)
+
         @self.app.route('/drawio')
         @self._check_password
         def list_drawio():
@@ -541,10 +643,12 @@ class WebServer:
             diagram_details = self._media_details(diagrams, is_video=False)
             for d in diagram_details:
                 d['is_drawio'] = True
+            page_details = self._page_details()
             return jsonify({
                 'images': image_details,
                 'videos': video_details,
                 'drawio': diagram_details,
+                'pages': page_details,
             })
     
     def start(self):

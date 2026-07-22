@@ -178,6 +178,7 @@ Access the web interface at http://localhost:6580 in your browser (or your custo
 - **Upload Images**: Drag-and-drop image upload with instant markdown link generation
 - **Upload Videos**: Video upload with processing options (resolution, compression via ffmpeg)
 - **Media Library**: Browse all images and videos (sorted newest-first by upload date) with one-click markdown/HTML copying
+- **Full-Text Search**: Search across every markdown page from the nav bar; results show matching pages with context snippets and hit counts
 - **Math Support**: Write equations using `$...$` for inline and `$$...$$` for display equations
 - **Password Protection**: Optional authentication (see command line options)
 - **Custom Titles**: Both notebook title and individual page titles are configurable

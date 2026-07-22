@@ -233,6 +233,7 @@ quick-md/
 
 ```
 GET  /                           # Homepage - redirects to /page/main.md
+GET  /search?q=...             # Full-text search across all markdown pages (auth protected)
 GET  /login                      # Password authentication page
 POST /login                      # Process login credentials
 GET  /logout                     # Clear session and logout

@@ -12,7 +12,7 @@
     }
 
     .media-sidebar {
-        width: 280px;
+        width: 340px;
         flex-shrink: 0;
         background: var(--c-surface);
         color: var(--c-text);
@@ -89,6 +89,7 @@
 
     .sidebar-tabs {
         display: flex;
+        flex-wrap: wrap;
         gap: 0.25rem;
         padding: 0 0.5rem;
         border-bottom: 2px solid var(--c-border);
@@ -96,7 +97,7 @@
     }
 
     .sidebar-tab {
-        padding: 0.4rem 0.6rem;
+        padding: 0.4rem 0.55rem;
         background: none;
         border: none;
         cursor: pointer;
@@ -104,6 +105,7 @@
         color: var(--c-muted);
         border-bottom: 3px solid transparent;
         margin-bottom: -2px;
+        white-space: nowrap;
     }
 
     .sidebar-tab.active {
@@ -113,6 +115,7 @@
     }
 
     .sidebar-media-list {
+        overflow-x: hidden;
         overflow-y: auto;
         flex: 1;
         padding: 0.5rem;
@@ -166,6 +169,9 @@
     .sidebar-media-date {
         font-size: 0.7rem;
         color: var(--c-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .sidebar-media-processing {
@@ -210,6 +216,15 @@
         font-size: 1.2rem;
         color: var(--c-err);
         background: var(--c-err-bg);
+    }
+
+    .sidebar-media-thumb-page {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        background: var(--c-active-line);
+        color: var(--c-muted);
     }
 
     @keyframes qmd-spin {
@@ -449,13 +464,14 @@
             <button onclick="openNewDrawioPage()" class="btn btn-secondary">+ Diagram</button>
         </div>
 
-        <input type="text" id="media-search" class="sidebar-search" placeholder="Search media (grep)..." oninput="renderSidebarMedia()">
+        <input type="text" id="media-search" class="sidebar-search" placeholder="Search media (grep)...">
 
         <div class="sidebar-tabs">
             <button class="sidebar-tab active" data-tab="all" onclick="switchSidebarTab('all')">All</button>
             <button class="sidebar-tab" data-tab="images" onclick="switchSidebarTab('images')">Images</button>
             <button class="sidebar-tab" data-tab="videos" onclick="switchSidebarTab('videos')">Videos</button>
             <button class="sidebar-tab" data-tab="drawio" onclick="switchSidebarTab('drawio')">Diagrams</button>
+            <button class="sidebar-tab" data-tab="pages" onclick="switchSidebarTab('pages')">Pages</button>
         </div>
 
         <div id="media-list" class="sidebar-media-list">
@@ -610,7 +626,7 @@ let view = null;
 const vimCompartment = new Compartment();
 let vimModeEnabled = false;
 let previewVisible = false;
-let mediaData = { images: [], videos: [], drawio: [] };
+let mediaData = { images: [], videos: [], drawio: [], pages: [] };
 let lastSavedContent = '';
 let autoSaveInterval = null;
 let currentSidebarTab = 'all';
@@ -730,6 +746,15 @@ function insertMedia(path, isImage) {
     showMessage('Media inserted at cursor position');
 }
 
+function insertPageLink(path, title) {
+    if (!view) return;
+    const link = `[${title}](${path})`;
+    view.focus();
+    view.dispatch(view.state.replaceSelection(link));
+    if (previewVisible) updatePreview();
+    showMessage('Page link inserted at cursor position');
+}
+
 function showMessage(text, isError = false) {
     const messageDiv = document.getElementById('message');
     messageDiv.className = 'message ' + (isError ? 'error' : 'success');
@@ -800,11 +825,18 @@ function getFilteredMedia() {
         items = mediaData.videos;
     } else if (currentSidebarTab === 'drawio') {
         items = mediaData.drawio;
+    } else if (currentSidebarTab === 'pages') {
+        items = mediaData.pages;
     }
     // Backend sorts each list by date desc; the combined "all" view needs a re-sort.
     items = items.slice().sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     if (query) {
-        items = items.filter(item => item.filename.toLowerCase().indexOf(query) !== -1);
+        // Match against the filename and, for pages, the page title too.
+        items = items.filter(item => {
+            const name = (item.filename || '').toLowerCase();
+            const title = (item.title || '').toLowerCase();
+            return name.indexOf(query) !== -1 || title.indexOf(query) !== -1;
+        });
     }
     return items;
 }
@@ -818,12 +850,26 @@ function renderSidebarMedia() {
         return;
     }
 
+    // Escape a string for safe use inside an HTML attribute.
+    function escAttr(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
     container.innerHTML = items.map(item => {
+        const isPage = !!item.is_page;
         const processing = !!item.processing;
         const failed = !!item.failed;
         const isDrawio = !!item.is_drawio;
-        let thumb, statusLine;
-        if (processing) {
+        let thumb, statusLine, displayName, kind, insertTitle;
+        if (isPage) {
+            thumb = `<div class="sidebar-media-thumb sidebar-media-thumb-page">📄</div>`;
+            statusLine = `<div class="sidebar-media-date">${escAttr(item.filename)} · ${escAttr(item.date)}</div>`;
+            displayName = item.title || item.filename;
+            kind = 'page';
+            insertTitle = item.title || item.filename;
+        } else if (processing) {
             thumb = `<div class="sidebar-media-thumb sidebar-media-thumb-processing">⏳</div>`;
             const pct = item.progress_percent;
             const speed = item.progress_speed;
@@ -833,41 +879,53 @@ function renderSidebarMedia() {
                 if (speed) label += ` (${speed})`;
             }
             statusLine = `<div class="sidebar-media-processing">${label}</div>`;
+            displayName = item.filename;
+            kind = (item.is_video && !isDrawio) ? 'video' : 'image';
+            insertTitle = displayName;
         } else if (failed) {
             thumb = `<div class="sidebar-media-thumb sidebar-media-thumb-failed">✕</div>`;
             statusLine = `<div class="sidebar-media-failed">Failed (encode error)</div>`;
+            displayName = item.filename;
+            kind = (item.is_video && !isDrawio) ? 'video' : 'image';
+            insertTitle = displayName;
         } else {
             // Diagrams are SVGs, so they preview as images just like real images.
             thumb = (item.is_video && !isDrawio)
-                ? `<video src="/media/${item.path}" class="sidebar-media-thumb" muted preload="metadata"></video>`
-                : `<img src="/media/${item.path}" class="sidebar-media-thumb" alt="${item.filename}">`;
-            statusLine = `<div class="sidebar-media-date">${item.date}</div>`;
+                ? `<video src="/media/${escAttr(item.path)}" class="sidebar-media-thumb" muted preload="metadata"></video>`
+                : `<img src="/media/${escAttr(item.path)}" class="sidebar-media-thumb" alt="${escAttr(item.filename)}">`;
+            statusLine = `<div class="sidebar-media-date">${escAttr(item.date)}</div>`;
+            displayName = item.filename;
+            kind = (item.is_video && !isDrawio) ? 'video' : 'image';
+            insertTitle = displayName;
         }
         // Diagrams get an extra inline Edit link (opens the draw.io editor in a
         // new tab) since they're not edited as raw text.
         const editLink = isDrawio
             ? `<a class="sidebar-media-insert btn btn-secondary" href="/edit_drawio/${encodeURI(item.path)}" target="_blank" rel="noopener" style="margin-right:0.25rem;">Edit</a>`
             : '';
-        // Diagrams insert as markdown image links, same as images.
-        const isImage = isDrawio || !item.is_video;
         return `
             <div class="sidebar-media-item">
                 ${thumb}
                 <div class="sidebar-media-info">
-                    <div class="sidebar-media-filename" title="${item.filename}">${item.filename}</div>
+                    <div class="sidebar-media-filename" title="${escAttr(displayName)}">${escAttr(displayName)}</div>
                     ${statusLine}
                 </div>
                 ${editLink}
-                <button class="sidebar-media-insert" data-path="${item.path}" data-is-image="${isImage}">Insert</button>
+                <button class="sidebar-media-insert" data-path="${escAttr(item.path)}" data-kind="${kind}" data-title="${escAttr(insertTitle)}">Insert</button>
             </div>
         `;
     }).join('');
 
-    container.querySelectorAll('.sidebar-media-insert').forEach(btn => {
+    container.querySelectorAll('.sidebar-media-insert[data-kind]').forEach(btn => {
         btn.addEventListener('click', function() {
             const path = this.getAttribute('data-path');
-            const isImage = this.getAttribute('data-is-image') === 'true';
-            insertMedia(path, isImage);
+            const kind = this.getAttribute('data-kind');
+            const title = this.getAttribute('data-title') || '';
+            if (kind === 'page') {
+                insertPageLink(path, title);
+            } else {
+                insertMedia(path, kind === 'image');
+            }
         });
     });
 }
@@ -1190,6 +1248,16 @@ initEditor();
 loadMedia();
 startAutoSave();
 
+// Media sidebar search: debounce so we only re-render after typing pauses,
+// instead of rebuilding the list on every keystroke. (The listener is
+// attached here rather than via an inline oninput= attribute because ES
+// module functions are not on the global scope that inline handlers see.)
+let mediaSearchTimer = null;
+document.getElementById('media-search').addEventListener('input', () => {
+    clearTimeout(mediaSearchTimer);
+    mediaSearchTimer = setTimeout(renderSidebarMedia, 120);
+});
+
 window.addEventListener('beforeunload', stopAutoSave);
 
 // Expose inline-onclick handlers to the global scope (ES modules are isolated).
@@ -1197,7 +1265,7 @@ Object.assign(window, {
     togglePreview, toggleMediaSidebar, switchSidebarTab,
     openUploadImageModal, closeUploadImageModal, uploadImageFromModal,
     openUploadVideoModal, closeUploadVideoModal, uploadVideoFromModal,
-    openNewDrawioPage, insertMedia, saveContent, updatePreview, showMessage,
+    openNewDrawioPage, insertMedia, insertPageLink, saveContent, updatePreview, showMessage,
 });
 </script>
 {% endblock %}
