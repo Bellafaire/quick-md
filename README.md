@@ -34,7 +34,7 @@ Docker ensures all dependencies are properly installed and files are owned by yo
 
 1. Clone this repository as a submodule in your markdown notebook:
    ```bash
-   git submodule add <repository-url> quick-md
+   git submodule add https://github.com/Bellafaire/quick-md.git quick-md
    git submodule update --init --recursive
    ```
 
@@ -128,7 +128,7 @@ notebook volume → `--notebook`, password env → `--password-protect`.
 
 1. Clone this repository as a submodule in your markdown notebook:
    ```bash
-   git submodule add <repository-url> quick-md
+   git submodule add https://github.com/Bellafaire/quick-md.git quick-md
    git submodule update --init --recursive
    ```
 
