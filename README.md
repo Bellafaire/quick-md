@@ -1,5 +1,7 @@
 # quick-md
-A git submodule utility for maintaining a markdown notebook with a web interface
+
+`quick-md` is a self-contained web application for keeping notes within a git repository as a submodule. 
+All markdown files are stored locally alongside images, videos, and draw.io diagrams. 
 
 ## Features
 
@@ -97,6 +99,8 @@ docker stop quick_md_notebook     # stop
 ```
 
 #### Password Protection
+
+A password can be set via the `--password` flag in case you want to protect your notebook from unauthorized access over the network.
 
 ```bash
 ./run.sh --password-protect                       # from $QUICK_MD_PASSWORD or prompt
