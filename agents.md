@@ -11,18 +11,16 @@ This document outlines the development principles and requirements followed duri
 - **Ignore unrelated issues** - Focus only on the task at hand, not pre-existing bugs
 
 ### 2. Feature Parity
-- **Identical functionality** between TUI and web interface
 - **Use existing functions** from `utils/` directory
-- **Extensibility is critical** - All features must work in both interfaces
-- **Shared configuration** - Both interfaces access the same `ConfigurationManager`
+- **Extensibility is critical** - All features must work in the web interface
+- **Shared configuration** - The web interface accesses the `ConfigurationManager`
 
 ### 3. Architecture
 
 #### Backend (Flask)
-- **Web server runs in parallel** with TUI
+- **Web server** is the application
 - **Background thread** - Server runs as daemon thread
-- **No conflicts** - Both interfaces can run simultaneously
-- **Clean shutdown** - Server stops when TUI exits
+- **Clean shutdown** - Server stops on Ctrl+C
 
 #### Configuration Manager
 - **Central source of truth** for all paths and settings
@@ -39,7 +37,7 @@ This document outlines the development principles and requirements followed duri
   - `image_handler.py` - Image copying and markdown link generation
   - `video_handler.py` - Video processing with ffmpeg
   - `configurations_manager.py` - Config file management
-- **Shared by both interfaces** - TUI and web use same logic
+- **Used by the web interface** - all logic lives in shared utils
 
 ### 4. User Interface Design
 
@@ -91,7 +89,6 @@ This document outlines the development principles and requirements followed duri
 #### Markdown Generation
 - **Images** - `![alt text](relative/path/filename.png)` (auto-detected path)
 - **Videos** - `<video width="640" loop autoplay controls><source src="relative/path/filename.webm"></video>`
-- **Clipboard support** - Markdown/HTML copied to clipboard (TUI)
 
 ### 6. Technology Stack
 
@@ -161,7 +158,7 @@ Solution: `_fix_media_paths()` converts to `/media/images/file.png` for web serv
 #### Command Line Arguments
 - **Port configuration** - `-p` or `--port` flag (default: 6580)
 - **Password protection** - `--password-protect` flag enables authentication
-- **Web-only mode** - `--web-only` flag runs server without TUI (for Docker/remote)
+- **Web-only mode** - `--web-only` flag is accepted for backward compatibility (the web server is always started)
 - **Password via environment** - `QUICK_MD_PASSWORD` env var for non-interactive setups
 - **Examples**:
   - `python3 main.py -p 8080`
@@ -182,7 +179,7 @@ Solution: `_fix_media_paths()` converts to `/media/images/file.png` for web serv
 - **Logout support** - Conditional logout link in navigation
 - **Environment variable** - `QUICK_MD_PASSWORD` for Docker/non-interactive deployments
 - **Interactive prompt** - `getpass.getpass()` for native installations
-- **Status indicator** - TUI shows "(password protected)" when enabled
+- **Interactive prompt** - `getpass.getpass()` for native installations
 
 #### Page Title Extraction
 - **First H1 detection** - Extracts actual page title from markdown content
@@ -192,7 +189,7 @@ Solution: `_fix_media_paths()` converts to `/media/images/file.png` for web serv
 - **Backward compatible** - Old format (string filenames) still supported
 
 #### Docker Deployment
-- **Web-only mode** - Runs without TUI using `--web-only` flag
+- **Web-only mode** - The `--web-only` flag is accepted for backward compatibility
 - **File ownership** - Container user matches host UID/GID via build args
 - **Environment variables** - `USER_ID`, `GROUP_ID`, `PORT`, `QUICK_MD_PASSWORD`
 - **Volume mounting** - Notebook directory mounted at `/notebook`
@@ -218,11 +215,7 @@ quick-md/
 ├── utils/
 │   ├── configurations_manager.py  # Config with dual path storage
 │   ├── image_handler.py          # Auto-detect relative paths
-│   ├── video_handler.py
-│   ├── menu.py                   # TUI menu with password support
-│   ├── new_page_menu.py          # Saves original page titles
-│   ├── new_image_menu.py
-│   └── new_video_menu.py
+│   └── video_handler.py
 └── templates/
     ├── base.html          # Base template with nav, notebook title, MathJax
     ├── login.html         # Password authentication page
@@ -318,7 +311,7 @@ local:
 ## Summary
 
 The Quick-MD web interface was built with these principles:
-1. **Feature parity** - Same functionality as TUI
+1. **Web-first** - All functionality exposed through the web interface
 2. **Parallel operation** - Both interfaces run simultaneously
 3. **Shared codebase** - Reuse utility functions
 4. **Mobile-first** - Responsive design for all devices
@@ -329,7 +322,7 @@ The Quick-MD web interface was built with these principles:
 9. **Portable** - Relative path storage allows notebook relocation
 10. **Deployable** - Docker support with proper file ownership
 
-All features maintain consistency between the TUI and web interfaces while providing enhancements specific to each environment (keyboard shortcuts for TUI, live preview for web).
+All features are exposed through the web interface, providing enhancements specific to the browser environment (live preview, media sidebar, etc.).
 
 ## Recent Major Changes
 
@@ -340,11 +333,11 @@ All features maintain consistency between the TUI and web interfaces while provi
 - `QUICK_MD_PASSWORD` environment variable for Docker/non-interactive use
 - Interactive `getpass.getpass()` prompt for native installations
 - Login/logout pages with proper redirects
-- Status indicator in TUI shows "(password protected)"
+- `--web-only` flag is accepted for backward compatibility (the web server is always started)
 
 ### Docker Support (2026-02-12)
 - Complete Docker setup with Dockerfile and docker-compose.yml
-- `--web-only` flag runs server without TUI (infinite loop with sleep)
+- `--web-only` flag accepted for backward compatibility (web server always starts)
 - Container user matches host UID/GID via build args
 - Working directory at `/notebook/quick-md` for correct path resolution
 - Volume mount at `/notebook` for notebook directory

@@ -1,11 +1,9 @@
 # quick-md
-A git submodule utility for maintaining a markdown notebook with both TUI and web interfaces
+A git submodule utility for maintaining a markdown notebook with a web interface
 
 ## Features
 
-- **TUI (Terminal User Interface)**: Fast keyboard-driven interface using Textual
 - **Web Interface**: Browser-based interface for editing and viewing markdown files
-- **Dual Access**: Both interfaces run in parallel - use whichever you prefer!
 - **Password Protection**: Optional password authentication for web access
 - **Configurable Title**: Customize your notebook's display name
 - **MathJax Support**: Write mathematical equations using `$` for inline math and `$$` for display equations
@@ -17,7 +15,7 @@ A git submodule utility for maintaining a markdown notebook with both TUI and we
 - Add videos with automatic ffmpeg processing and compression
 - **Draw.io Diagrams**: Create and edit draw.io diagrams right in the web page; they're saved as `.drawio.svg` files (real SVGs that render inline in your pages without any export step) and stay re-editable. Diagrams are managed alongside images and videos and inserted into pages the same way  
 - View and edit markdown with live preview (web interface)
-- Copy markdown links and HTML tags to clipboard
+- Copy markdown links and HTML tags to clipboard via the web media library
 
 ## Setup
 
@@ -54,7 +52,7 @@ Docker ensures all dependencies are properly installed and files are owned by yo
 > launch as many independent instances as you like — just give each one a unique
 > `--container` name and `--port`.
 >
-> **Note:** Docker runs in web-only mode (no TUI). For the TUI interface, use native installation.
+
 
 #### `run.sh` Options
 
@@ -138,7 +136,7 @@ notebook volume → `--notebook`, password env → `--password-protect`.
    python3 main.py
    ```
 
-The TUI will launch and the web server will start automatically. The web server address will be displayed in the bottom right of the TUI (default: http://0.0.0.0:6580).
+The web server will start automatically (default: http://0.0.0.0:6580).
 
 ### Command Line Options
 
@@ -153,35 +151,20 @@ python3 main.py --password-protect
 export QUICK_MD_PASSWORD=your_password
 python3 main.py --password-protect
 
-# Web-only mode (no TUI) - useful for servers/Docker
-python3 main.py --web-only
-
 # Combine options
-python3 main.py --web-only --port 8080 --password-protect
+python3 main.py --port 8080 --password-protect
 ```
 
 **Available Options:**
 - `--port PORT`: Specify web server port (default: 6580)
 - `--password-protect`: Enable password authentication for web access
-- `--web-only`: Run web server only without TUI (keeps server alive)
+- `--web-only`: Accepted for backward compatibility (the web server is always started)
 
 **Password Methods:**
 1. **Interactive**: Run with `--password-protect` and enter password when prompted
 2. **Environment Variable**: Set `QUICK_MD_PASSWORD` before running (useful for scripts/Docker)
 
 ## Usage
-
-### TUI (Terminal Interface)
-
-Navigate the menu using:
-- Number keys (1-4) to select options
-- `q` to quit
-- Arrow keys and Enter to interact with forms
-
-Features:
-- **New Page**: Create a new markdown page with date-prefixed filename
-- **Add Image**: Copy the most recent screenshot from your screenshots directory
-- **Add Video**: Process and add videos with customizable resolution and compression
 
 ### Web Interface
 
@@ -327,12 +310,10 @@ cd quick-md/vendor
 
 ## Architecture
 
-The application uses a shared `ConfigurationManager` that both the TUI and web interface access. This ensures feature parity between both interfaces:
+The application uses a `ConfigurationManager` that the web interface accesses:
 
-- Both use the same underlying functions from `utils/` directory
-- Changes made in one interface are immediately visible in the other
-- The web server runs in a background thread, allowing both interfaces to run simultaneously
-- Docker mode runs web-only (no TUI) with the server kept alive indefinitely
+- All functionality uses the same underlying functions from the `utils/` directory
+- Docker mode runs the server with the main thread kept alive indefinitely
 
 **Configuration Storage:**
 - The config file stores relative paths which are resolved to absolute paths at runtime
@@ -343,8 +324,6 @@ The application uses a shared `ConfigurationManager` that both the TUI and web i
 
 ### Python Dependencies
 - PyYAML>=6.0
-- pyperclip>=1.8.2
-- textual>=0.47.0
 - Flask>=3.0.0
 - markdown>=3.5.0
 
