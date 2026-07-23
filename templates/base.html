@@ -67,26 +67,42 @@
             background: var(--c-base);
         }
 
-        /* ---- Nav (surface, 30%) ---- */
+        /* ---- Nav (surface, 30%) ----
+           Grid layout: title | links | controls.
+           The links cell spans both grid rows so that on wide screens
+           everything sits on a single row, but when the links overflow
+           they wrap onto a second row while the title and controls stay
+           anchored on the top row. */
         nav {
             background: var(--c-surface);
             color: var(--c-text);
-            padding: 1rem;
+            padding: 0.15rem 1rem;
             border-bottom: 1px solid var(--c-border);
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            grid-template-rows: auto auto;
+            align-items: baseline;
+            column-gap: 1.5rem;
+            row-gap: 0.5rem;
         }
 
         nav h1 {
-            margin-bottom: 0.5rem;
+            grid-column: 1;
+            grid-row: 1;
+            margin: 0;
             font-size: 1.5rem;
             color: var(--c-text);
         }
 
-        nav ul {
+        nav ul.nav-links {
+            grid-column: 2;
+            grid-row: 1 / span 2;
             list-style: none;
             display: flex;
             gap: 1rem;
             flex-wrap: wrap;
             align-items: center;
+            padding-left: 2rem;
         }
 
         nav a {
@@ -100,7 +116,9 @@
         }
 
         .nav-controls {
-            margin-left: auto;
+            grid-column: 3;
+            grid-row: 1;
+            align-self: center;
             display: flex;
             align-items: center;
             gap: 0.5rem;
@@ -377,7 +395,7 @@
                 gap: 1rem;
             }
 
-            nav ul {
+            nav ul.nav-links {
                 font-size: 0.9rem;
                 gap: 0.75rem;
             }
@@ -405,7 +423,7 @@
                 font-size: 1.25rem;
             }
 
-            nav ul {
+            nav ul.nav-links {
                 font-size: 0.85rem;
                 gap: 0.5rem;
             }
@@ -420,8 +438,8 @@
 </head>
 <body>
     <nav>
-        <h1>{{ notebook_title }}</h1>
-        <ul>
+        <h1>{% block nav_title %}{{ notebook_title }}{% endblock %}</h1>
+        <ul class="nav-links">
             <li><a href="/">Home</a></li>
             <li><a href="/new_page">New Page</a></li>
             <li><a href="/images">Images</a></li>
@@ -430,22 +448,23 @@
             {% if password_protected %}
             <li><a href="/logout">Logout</a></li>
             {% endif %}
-            <li class="nav-controls">
-                <form class="nav-search" action="/search" method="get" role="search">
-                    <input type="search" name="q" id="nav-search-q" placeholder="Search pages…" aria-label="Search pages" value="{% block nav_search_query %}{% endblock %}">
-                    <button type="submit" class="btn btn-secondary">Search</button>
-                </form>
-                <label class="vim-nav-toggle" for="vim-mode-toggle" title="Toggle Vim keybindings in the editor">
-                    <input type="checkbox" id="vim-mode-toggle"> Vim
-                </label>
-                <label for="width-selector">Width:</label>
-                <select id="width-selector">
-                    <option value="narrow">Narrow</option>
-                    <option value="standard">Standard</option>
-                    <option value="full">Full</option>
-                </select>
-            </li>
+            {% block nav_actions %}{% endblock %}
         </ul>
+        <div class="nav-controls">
+            <form class="nav-search" action="/search" method="get" role="search">
+                <input type="search" name="q" id="nav-search-q" placeholder="Search pages…" aria-label="Search pages" value="{% block nav_search_query %}{% endblock %}">
+                <button type="submit" class="btn btn-secondary">Search</button>
+            </form>
+            <label class="vim-nav-toggle" for="vim-mode-toggle" title="Toggle Vim keybindings in the editor">
+                <input type="checkbox" id="vim-mode-toggle"> Vim
+            </label>
+            <label for="width-selector">Width:</label>
+            <select id="width-selector">
+                <option value="narrow">Narrow</option>
+                <option value="standard">Standard</option>
+                <option value="full">Full</option>
+            </select>
+        </div>
     </nav>
     
     <div class="container">
@@ -455,25 +474,30 @@
     {% block extra_scripts %}{% endblock %}
     
     <script>
-        // Width selector: persists choice in localStorage and applies it via
-        // the --content-width CSS variable on :root.
+        // Width selector: persists choice per-context in localStorage and
+        // applies it via the --content-width CSS variable on :root. The editor
+        // and the viewer keep independent width settings (e.g. "full" for the
+        // editor, "standard" for reading), keyed by the width_mode block below.
         (function () {
+            var WIDTH_MODE = '{% block width_mode %}view{% endblock %}';
+            var DEFAULT_WIDTH = WIDTH_MODE === 'edit' ? 'full' : 'standard';
+            var STORAGE_KEY = 'qmd-width-' + WIDTH_MODE;
             var WIDTH_MAP = {
                 'narrow': '720px',
                 'standard': '1200px',
                 'full': 'none'
             };
             function applyWidth(value) {
-                var cssValue = WIDTH_MAP[value] || WIDTH_MAP['standard'];
+                var cssValue = WIDTH_MAP[value] || WIDTH_MAP[DEFAULT_WIDTH];
                 document.documentElement.style.setProperty('--content-width', cssValue);
             }
             var sel = document.getElementById('width-selector');
             if (sel) {
-                var saved = localStorage.getItem('qmd-width') || 'standard';
+                var saved = localStorage.getItem(STORAGE_KEY) || DEFAULT_WIDTH;
                 sel.value = saved;
                 applyWidth(saved);
                 sel.addEventListener('change', function () {
-                    localStorage.setItem('qmd-width', sel.value);
+                    localStorage.setItem(STORAGE_KEY, sel.value);
                     applyWidth(sel.value);
                     document.dispatchEvent(new CustomEvent('qmd:width-change', {detail: sel.value}));
                 });

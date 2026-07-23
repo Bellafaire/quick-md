@@ -2,6 +2,10 @@
 
 {% block title %}Edit {{ page_title }} - {{ notebook_title }}{% endblock %}
 
+{% block nav_title %}{{ page_title }}{% endblock %}
+
+{% block width_mode %}edit{% endblock %}
+
 {% block extra_css %}
 <style>
     /* ---- Editor layout: media sidebar + main editor area ---- */
@@ -485,18 +489,7 @@
     <!-- Main editor area -->
     <div class="editor-main">
         <div class="card">
-            <div class="page-header">
-                <h2>Edit: {{ page_title }}</h2>
-                <div class="button-group">
-                    <button onclick="togglePreview()" class="btn btn-secondary" id="preview-toggle">Show Preview</button>
-                    <a href="/page/{{ filename }}" class="btn btn-secondary">Cancel</a>
-                </div>
-            </div>
-
             <div id="message"></div>
-            <div class="autosave-row">
-                <span id="autosave-status" style="color: var(--c-muted); font-size: 0.85rem;">Auto-save enabled</span>
-            </div>
 
             <!-- Hidden source for the initial document content -->
             <textarea id="content-source" style="display:none;">{{ content }}</textarea>
@@ -504,9 +497,12 @@
             <div id="editor-wrapper">
                 <div id="editor-panel">
                     <div id="codemirror-editor"></div>
-                    <div style="margin-top: 0.5rem;">
+                    <div class="page-footer" style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                        <span id="autosave-status" style="color: var(--c-muted); font-size: 0.85rem; margin-right: auto;">Auto-save enabled</span>
+                        <button onclick="togglePreview()" class="btn btn-secondary" id="preview-toggle">Show Preview</button>
+                        <button onclick="updatePreview()" class="btn btn-secondary">Update Preview</button>
+                        <a href="/page/{{ filename }}" class="btn btn-secondary">Cancel</a>
                         <button onclick="saveContent()" class="btn">Save Changes</button>
-                        <button onclick="updatePreview()" class="btn btn-secondary" style="margin-left: 0.5rem;">Update Preview</button>
                     </div>
                 </div>
 

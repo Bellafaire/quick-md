@@ -2,6 +2,8 @@
 
 {% block title %}{{ page_title }} - {{ notebook_title }}{% endblock %}
 
+{% block nav_title %}{{ page_title }}{% endblock %}
+
 {% block extra_css %}
 <style>
     .drawio-header {
@@ -27,7 +29,7 @@
     .drawio-frame-wrap {
         position: relative;
         width: 100%;
-        height: calc(100vh - 175px);
+        height: calc(100vh - 215px);
         min-height: 420px;
         border: 1px solid var(--c-border);
         border-radius: var(--radius);
@@ -77,16 +79,6 @@
 
 {% block content %}
 <div class="card">
-    <div class="drawio-header">
-        <h2>{{ page_title }}</h2>
-        <div class="drawio-toolbar">
-            <span id="saving-badge" class="drawio-saving-badge"></span>
-            <button onclick="saveDiagram(false)" class="btn">Save</button>
-            <button onclick="saveDiagram(true)" class="btn">Save &amp; Close</button>
-            <a href="/drawio" class="btn btn-secondary">Cancel</a>
-        </div>
-    </div>
-
     {% if not filename %}
     <label for="diagram-title">Diagram Title:</label>
     <input type="text" id="diagram-title" class="drawio-title-input"
@@ -110,6 +102,13 @@
                 src="https://embed.diagrams.net/?embed=1&proto=json&noSaveBtn=1&noExitBtn=1&gapi=0&db=0&gl=0&tr=0"
                 allow="clipboard-read; clipboard-write"
                 referrerpolicy="no-referrer"></iframe>
+    </div>
+
+    <div class="page-footer" style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+        <span id="saving-badge" class="drawio-saving-badge" style="margin-right: auto; margin-left: 0;"></span>
+        <button onclick="saveDiagram(false)" class="btn">Save</button>
+        <button onclick="saveDiagram(true)" class="btn">Save &amp; Close</button>
+        <a href="/drawio" class="btn btn-secondary">Cancel</a>
     </div>
 </div>
 {% endblock %}

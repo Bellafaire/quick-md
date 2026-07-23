@@ -2,68 +2,27 @@
 
 {% block title %}{{ page_title }} - {{ notebook_title }}{% endblock %}
 
+{% block nav_title %}{{ page_title }}{% endblock %}
+
 {% block extra_css %}
 <style>
-    .page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 1rem;
-        gap: 1rem;
-        flex-wrap: wrap;
-    }
-    
-    .page-header h2 {
-        flex: 1;
-        min-width: 200px;
-    }
-    
-    .button-group {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-    }
-    
-    @media (max-width: 768px) {
-        .page-header {
-            flex-direction: column;
-            align-items: stretch;
-        }
-        
-        .page-header h2 {
-            font-size: 1.25rem;
-            margin-bottom: 0.5rem;
-        }
-        
-        .button-group {
-            width: 100%;
-        }
-        
-        .button-group > * {
-            flex: 1;
-            min-width: fit-content;
-        }
-    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="card">
-    <div class="page-header">
-        <h2>{{ page_title }}</h2>
-        <div class="button-group">
-            <button onclick="toggleView()" class="btn btn-secondary" id="toggle-btn">Show Raw</button>
-            <a href="/edit/{{ filename }}" class="btn">Edit</a>
-            <a href="/" class="btn btn-secondary">Back to Home</a>
-        </div>
-    </div>
-    
     <div id="rendered-view" class="markdown-content">
         {{ html_content|safe }}
     </div>
     
     <div id="raw-view" class="code-display" style="display: none;">
         <pre>{{ content }}</pre>
+    </div>
+
+    <div class="page-footer" style="margin-top: 1.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end;">
+        <button onclick="toggleView()" class="btn btn-secondary" id="toggle-btn">Show Raw</button>
+        <a href="/edit/{{ filename }}" class="btn">Edit</a>
+        <a href="/" class="btn btn-secondary">Back to Home</a>
     </div>
 </div>
 {% endblock %}
