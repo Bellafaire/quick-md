@@ -76,14 +76,13 @@
         nav {
             background: var(--c-surface);
             color: var(--c-text);
-            padding: 0.15rem 1rem;
+            padding: 0.3rem 1rem;
             border-bottom: 1px solid var(--c-border);
             display: grid;
             grid-template-columns: auto 1fr auto;
-            grid-template-rows: auto auto;
-            align-items: baseline;
+            grid-template-rows: auto;
+            align-items: center;
             column-gap: 1.5rem;
-            row-gap: 0.5rem;
         }
 
         nav h1 {
@@ -91,12 +90,14 @@
             grid-row: 1;
             margin: 0;
             font-size: 1.5rem;
+            line-height: 1.25;
+            white-space: nowrap;
             color: var(--c-text);
         }
 
         nav ul.nav-links {
             grid-column: 2;
-            grid-row: 1 / span 2;
+            grid-row: 1;
             list-style: none;
             display: flex;
             gap: 1rem;
@@ -118,10 +119,47 @@
         .nav-controls {
             grid-column: 3;
             grid-row: 1;
-            align-self: center;
             display: flex;
             align-items: center;
             gap: 0.5rem;
+        }
+
+        /* Narrow screens: drop the nav links to a full-width second row so
+           they stay horizontal instead of stacking vertically in the middle
+           column. The title and controls remain on the top row. */
+        @media (max-width: 72rem) {
+            nav {
+                grid-template-rows: auto auto;
+                row-gap: 0.5rem;
+            }
+            nav h1 { grid-row: 1; }
+            nav ul.nav-links {
+                grid-column: 1 / -1;
+                grid-row: 2;
+                padding-left: 0;
+            }
+            .nav-controls { grid-row: 1; }
+        }
+
+        /* Very narrow: drop the search/Vim/width controls to their own
+           full-width row (row 3) below the links, and let them wrap. */
+        @media (max-width: 40rem) {
+            nav {
+                grid-template-rows: auto auto auto;
+            }
+            .nav-controls {
+                grid-column: 1 / -1;
+                grid-row: 3;
+                flex-wrap: wrap;
+            }
+            .nav-search {
+                flex: 1 1 auto;
+            }
+            .nav-search input[type="search"] {
+                width: auto;
+                flex: 1 1 auto;
+                min-width: 8rem;
+            }
         }
 
         .nav-controls label {
@@ -451,6 +489,7 @@
             {% block nav_actions %}{% endblock %}
         </ul>
         <div class="nav-controls">
+            {% block nav_controls %}
             <form class="nav-search" action="/search" method="get" role="search">
                 <input type="search" name="q" id="nav-search-q" placeholder="Search pages…" aria-label="Search pages" value="{% block nav_search_query %}{% endblock %}">
                 <button type="submit" class="btn btn-secondary">Search</button>
@@ -464,6 +503,7 @@
                 <option value="standard">Standard</option>
                 <option value="full">Full</option>
             </select>
+            {% endblock %}
         </div>
     </nav>
     

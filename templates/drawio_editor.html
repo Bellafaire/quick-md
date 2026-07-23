@@ -4,39 +4,62 @@
 
 {% block nav_title %}{{ page_title }}{% endblock %}
 
+{% block nav_controls %}
+    <span id="saving-badge" class="drawio-saving-badge" style="margin-left:0;"></span>
+    <button onclick="saveDiagram(false)" class="btn">Save</button>
+    <button onclick="saveDiagram(true)" class="btn">Save &amp; Close</button>
+    <a href="/drawio" class="btn btn-secondary">Cancel</a>
+{% endblock %}
+
 {% block extra_css %}
 <style>
-    .drawio-header {
+    /* Full-bleed draw.io editor: the canvas occupies the entire area below
+       the nav bar, edge to edge, with the save buttons living in the nav. */
+    body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    html { height: 100%; }
+    nav { flex: 0 0 auto; }
+    .container {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        flex: 1;
+        min-height: 0;
         display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 1rem;
-        flex-wrap: wrap;
-        margin-bottom: 1rem;
+        flex-direction: column;
     }
-    .drawio-header h2 { margin: 0; flex: 1; min-width: 200px; }
-    .drawio-title-input {
-        width: 100%;
-        max-width: 360px;
-        margin-bottom: 0;
-    }
-    .drawio-toolbar {
+    .drawio-page {
+        flex: 1;
+        min-height: 0;
         display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
+        flex-direction: column;
+    }
+    .drawio-title-bar {
+        display: flex;
         align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--c-border);
+        background: var(--c-surface);
+    }
+    .drawio-title-bar label { margin: 0; font-weight: 600; }
+    .drawio-title-input {
+        flex: 1;
+        max-width: 420px;
+        margin: 0;
     }
     .drawio-frame-wrap {
         position: relative;
+        flex: 1;
+        min-height: 0;
         width: 100%;
-        height: calc(100vh - 215px);
-        min-height: 420px;
-        border: 1px solid var(--c-border);
-        border-radius: var(--radius);
+        border: 0;
+        border-radius: 0;
         overflow: hidden;
         background: var(--c-surface);
     }
     .drawio-frame-wrap iframe {
+        position: absolute;
+        inset: 0;
         width: 100%;
         height: 100%;
         border: 0;
@@ -65,7 +88,6 @@
     }
     @keyframes qmd-spin { to { transform: rotate(360deg); } }
     .drawio-saving-badge {
-        margin-left: 0.5rem;
         font-size: 0.85rem;
         color: var(--c-muted);
         opacity: 0;
@@ -78,12 +100,13 @@
 {% endblock %}
 
 {% block content %}
-<div class="card">
+<div class="drawio-page">
     {% if not filename %}
-    <label for="diagram-title">Diagram Title:</label>
-    <input type="text" id="diagram-title" class="drawio-title-input"
-           placeholder="Enter a title for this diagram" required
-           style="margin-bottom: 1rem;">
+    <div class="drawio-title-bar">
+        <label for="diagram-title">Diagram Title:</label>
+        <input type="text" id="diagram-title" class="drawio-title-input"
+               placeholder="Enter a title for this diagram" required>
+    </div>
     {% endif %}
 
     <div id="message"></div>
@@ -103,24 +126,12 @@
                 allow="clipboard-read; clipboard-write"
                 referrerpolicy="no-referrer"></iframe>
     </div>
-
-    <div class="page-footer" style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
-        <span id="saving-badge" class="drawio-saving-badge" style="margin-right: auto; margin-left: 0;"></span>
-        <button onclick="saveDiagram(false)" class="btn">Save</button>
-        <button onclick="saveDiagram(true)" class="btn">Save &amp; Close</button>
-        <a href="/drawio" class="btn btn-secondary">Cancel</a>
-    </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-// This page always uses the "Full" content width (no max-width), regardless of
-// the saved width preference, so the draw.io editor has the whole viewport.
-(function () {
-    document.documentElement.style.setProperty('--content-width', 'none');
-    var sel = document.getElementById('width-selector');
-    if (sel && sel.parentElement) sel.parentElement.style.display = 'none';
-})();
+// Full-bleed layout is handled in CSS (the canvas flexes to fill the area
+// below the nav). The save buttons live in the nav's upper-right slot.
 
 // Diagram source the editor should open with. Empty -> a blank diagram.
 const INITIAL_XML = {{ initial_xml|tojson|safe if initial_xml else '""'|safe }};
