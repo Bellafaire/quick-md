@@ -37,6 +37,7 @@ class ConfigurationManager:
     def get_default_config(self):
         return {
             "notebook_title": "Quick-md Notebook",
+            "default_image_width": 600,
             "local": {
                 "md_path": "docs/",
                 "images_path": "docs/images", 

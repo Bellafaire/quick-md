@@ -266,11 +266,13 @@ class WebServer:
         def inject_password_protected():
             notebook_title = self.config_manager.config.get('notebook_title', 'Quick-md Notebook')
             theme = resolve_theme(self.config_manager.config.get('theme'))
+            default_image_width = self.config_manager.config.get('default_image_width', 600)
             return {
                 'password_protected': self.password is not None,
                 'notebook_title': notebook_title,
                 'theme': theme,
                 'theme_json': json.dumps(theme),
+                'default_image_width': default_image_width,
             }
         
         @self.app.route('/login', methods=['GET', 'POST'])

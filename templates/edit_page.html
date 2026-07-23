@@ -617,6 +617,9 @@ import {
 
 // Theme palette injected from the server (utils/theme.py).
 const THEME = {{ theme_json|safe }};
+// Default on-page image width (px) for images/diagrams inserted via the
+// media browser. Configured in .qmd_conf as `default_image_width`.
+const DEFAULT_IMAGE_WIDTH = {{ default_image_width|default(600) }};
 
 let view = null;
 const vimCompartment = new Compartment();
@@ -730,9 +733,12 @@ function togglePreview() {
 function insertMedia(path, isImage) {
     if (!view) return;
     let mediaText;
+    const alt = path.split('/').pop().replace(/\.[^/.]+$/, '');
     if (isImage) {
-        const alt = path.split('/').pop().replace(/\.[^/.]+$/, '');
-        mediaText = `![${alt}](${path})`;
+        // Images and draw.io diagrams: a fixed-width <img> centered via
+        // inline style (configurable via default_image_width in .qmd_conf).
+        // Diagrams are SVGs so they render exactly like images.
+        mediaText = `<img src="${path}" width="${DEFAULT_IMAGE_WIDTH}" alt="${alt}" style="display:block; margin:0 auto;">`;
     } else {
         mediaText = `<video width="640" loop autoplay controls><source src="${path}" type="video/webm"></video>`;
     }
