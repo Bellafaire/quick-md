@@ -501,7 +501,7 @@
                         <span id="autosave-status" style="color: var(--c-muted); font-size: 0.85rem; margin-right: auto;">Auto-save enabled</span>
                         <button onclick="togglePreview()" class="btn btn-secondary" id="preview-toggle">Show Preview</button>
                         <button onclick="updatePreview()" class="btn btn-secondary">Update Preview</button>
-                        <a href="/page/{{ filename }}" class="btn btn-secondary">Cancel</a>
+                        <button onclick="exitEditor()" class="btn btn-secondary">Exit Editor</button>
                         <button onclick="saveContent()" class="btn">Save Changes</button>
                     </div>
                 </div>
@@ -612,7 +612,7 @@
 import {
     EditorView, basicSetup, EditorState, Compartment,
     keymap, defaultKeymap, indentWithTab,
-    markdown, syntaxHighlighting, HighlightStyle, tags, vim
+    markdown, syntaxHighlighting, HighlightStyle, tags, vim, Vim
 } from '/static/js/qmd-editor.js';
 
 // Theme palette injected from the server (utils/theme.py).
@@ -620,6 +620,11 @@ const THEME = {{ theme_json|safe }};
 // Default on-page image width (px) for images/diagrams inserted via the
 // media browser. Configured in .qmd_conf as `default_image_width`.
 const DEFAULT_IMAGE_WIDTH = {{ default_image_width|default(600) }};
+
+// Bind Vim ex commands :q and :wq to save-and-exit the editor. Any exit
+// from the editor always saves first (see exitEditor) so edits are never lost.
+Vim.defineEx('q', 'q', () => exitEditor());
+Vim.defineEx('wq', 'wq', () => exitEditor());
 
 let view = null;
 const vimCompartment = new Compartment();
@@ -1187,17 +1192,17 @@ function updatePreview() {
 }
 
 function saveContent(isAutoSave = false) {
-    if (!view) return;
+    if (!view) return Promise.resolve();
     const content = view.state.doc.toString();
 
     if (isAutoSave && content === lastSavedContent) {
-        return;
+        return Promise.resolve();
     }
 
     const formData = new FormData();
     formData.append('content', content);
 
-    fetch('/save/{{ filename }}', {
+    return fetch('/save/{{ filename }}', {
         method: 'POST',
         body: formData
     })
@@ -1226,6 +1231,13 @@ function saveContent(isAutoSave = false) {
             showMessage('Error saving file', true);
         }
     });
+}
+
+// Always save before leaving the editor so no edits are lost. Used by the
+// Exit Editor button, :q / :wq Vim ex commands, and beforeunload.
+function exitEditor() {
+    const target = '/page/' + {{ filename|tojson }};
+    saveContent().finally(() => { window.location.href = target; });
 }
 
 function startAutoSave() {
@@ -1267,7 +1279,7 @@ Object.assign(window, {
     togglePreview, toggleMediaSidebar, switchSidebarTab,
     openUploadImageModal, closeUploadImageModal, uploadImageFromModal,
     openUploadVideoModal, closeUploadVideoModal, uploadVideoFromModal,
-    openNewDrawioPage, insertMedia, insertPageLink, saveContent, updatePreview, showMessage,
+    openNewDrawioPage, insertMedia, insertPageLink, saveContent, updatePreview, showMessage, exitEditor,
 });
 </script>
 {% endblock %}
