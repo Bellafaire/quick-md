@@ -9,7 +9,8 @@ def create_video_html_tag(relative_path, width="640", loop=True, autoplay=True, 
     autoplay_attr = "autoplay " if autoplay else ""
     controls_attr = "controls" if controls else ""
     
-    return f'<video width="{width}" {loop_attr}{autoplay_attr}{controls_attr}><source src="{relative_path}" type="video/mp4"></video>'
+    path = relative_path if relative_path.startswith('/') else '/' + relative_path
+    return f'<video width="{width}" {loop_attr}{autoplay_attr}{controls_attr}><source src="{path}" type="video/mp4"></video>'
 
 
 def progress_file_for(dest_path):

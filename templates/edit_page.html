@@ -737,6 +737,7 @@ function togglePreview() {
 
 function insertMedia(path, isImage) {
     if (!view) return;
+    if (!path.startsWith('/')) path = '/' + path;
     let mediaText;
     const alt = path.split('/').pop().replace(/\.[^/.]+$/, '');
     if (isImage) {
@@ -897,9 +898,10 @@ function renderSidebarMedia() {
             insertTitle = displayName;
         } else {
             // Diagrams are SVGs, so they preview as images just like real images.
+            const _path = item.path.startsWith('/') ? item.path : '/' + item.path;
             thumb = (item.is_video && !isDrawio)
-                ? `<video src="/media/${escAttr(item.path)}" class="sidebar-media-thumb" muted preload="metadata"></video>`
-                : `<img src="/media/${escAttr(item.path)}" class="sidebar-media-thumb" alt="${escAttr(item.filename)}">`;
+                ? `<video src="${escAttr(_path)}" class="sidebar-media-thumb" muted preload="metadata"></video>`
+                : `<img src="${escAttr(_path)}" class="sidebar-media-thumb" alt="${escAttr(item.filename)}">`;
             statusLine = `<div class="sidebar-media-date">${escAttr(item.date)}</div>`;
             displayName = item.filename;
             kind = (item.is_video && !isDrawio) ? 'video' : 'image';
@@ -907,6 +909,7 @@ function renderSidebarMedia() {
         }
         // Diagrams get an extra inline Edit link (opens the draw.io editor in a
         // new tab) since they're not edited as raw text.
+        const _path = item.path.startsWith('/') ? item.path : '/' + item.path;
         const editLink = isDrawio
             ? `<a class="sidebar-media-insert btn btn-secondary" href="/edit_drawio/${encodeURI(item.path)}" target="_blank" rel="noopener" style="margin-right:0.25rem;">Edit</a>`
             : '';
@@ -918,7 +921,7 @@ function renderSidebarMedia() {
                     ${statusLine}
                 </div>
                 ${editLink}
-                <button class="sidebar-media-insert" data-path="${escAttr(item.path)}" data-kind="${kind}" data-title="${escAttr(insertTitle)}">Insert</button>
+                <button class="sidebar-media-insert" data-path="${escAttr(_path)}" data-kind="${kind}" data-title="${escAttr(insertTitle)}">Insert</button>
             </div>
         `;
     }).join('');
@@ -1030,7 +1033,7 @@ function uploadImageFromModal(event) {
                 progressLabel.textContent = 'Upload complete!';
 
                 document.getElementById('upload-image-result-preview').innerHTML =
-                    '<img src="/media/' + data.relative_path + '" style="max-width:100%;max-height:200px;border-radius:4px;margin-bottom:0.5rem;">';
+                    '<img src="/' + data.relative_path + '" style="max-width:100%;max-height:200px;border-radius:4px;margin-bottom:0.5rem;">';
                 document.getElementById('upload-image-result-msg').textContent = data.message;
                 document.getElementById('upload-image-result').style.display = 'block';
 

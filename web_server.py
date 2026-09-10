@@ -38,11 +38,58 @@ class WebServer:
         return decorated_function
     
     def _fix_media_paths(self, html_content):
-        """Convert relative media paths to absolute /media/ paths"""
-        # Fix image/video tags: src="images/..." or src="videos/..." or src="figures/..." (draw.io diagrams) -> src="/media/..."
-        html_content = re.sub(r'src="((?:images|videos|figures)/[^"]+)"', r'src="/media/\1"', html_content)
-        # Fix markdown image syntax that got converted to HTML
-        html_content = re.sub(r'<img alt="([^"]*)" src="([^"]+)"', lambda m: f'<img alt="{m.group(1)}" src="/media/{m.group(2)}"' if not m.group(2).startswith(('/media/', 'http')) else m.group(0), html_content)
+        """Convert relative and legacy /media/ paths to absolute root-relative paths.
+
+        - src="images/..." -> src="/images/..."
+        - src="/media/images/..." -> src="/images/..."
+        - Already absolute paths (other than /media/) are left alone.
+        - External URLs (http://...) are left alone.
+        """
+        def _normalize(path):
+            if path.startswith('/media/'):
+                path = path[7:]
+            if path and not path.startswith(('/', 'http')):
+                path = '/' + path
+            return path
+
+        # 1. Fix generic src attributes for images/videos/figures
+        html_content = re.sub(
+            r'src="((?:images|videos|figures)/[^"]+)"',
+            lambda m: f'src="{_normalize(m.group(1))}"',
+            html_content
+        )
+
+        # 2. Fix legacy /media/ paths in any src attribute
+        html_content = re.sub(
+            r'src="/media/([^"]+)"',
+            lambda m: f'src="{_normalize("/media/" + m.group(1))}"',
+            html_content
+        )
+
+        # 3. Fix <img> tags (with or without alt)
+        def _fix_img_tag(m):
+            tag = m.group(0)
+            src_match = re.search(r'src="([^"]+)"', tag)
+            if src_match:
+                old_src = src_match.group(0)
+                new_src = f'src="{_normalize(src_match.group(1))}"'
+                tag = tag.replace(old_src, new_src, 1)
+            return tag
+
+        html_content = re.sub(r'<img\b[^\u003e]*\u003e', _fix_img_tag, html_content)
+
+        # 4. Fix <source> tags in <video>
+        def _fix_source_tag(m):
+            tag = m.group(0)
+            src_match = re.search(r'src="([^"]+)"', tag)
+            if src_match:
+                old_src = src_match.group(0)
+                new_src = f'src="{_normalize(src_match.group(1))}"'
+                tag = tag.replace(old_src, new_src, 1)
+            return tag
+
+        html_content = re.sub(r'<source\b[^\u003e]*\u003e', _fix_source_tag, html_content)
+
         return html_content
     
     def _extract_title_from_markdown(self, content):
@@ -584,7 +631,7 @@ class WebServer:
             relative_path = f"{relative_dir}/{filename}"
             self.config_manager.add_drawio_to_config(relative_path)
 
-            markdown_link = f"![{title}]({relative_path})"
+            markdown_link = f"![{title}](/{relative_path})"
             return jsonify({
                 'success': True,
                 'message': 'Diagram saved successfully',
@@ -623,6 +670,38 @@ class WebServer:
             directory = os.path.dirname(file_path)
             file_name = os.path.basename(file_path)
             return send_from_directory(directory, file_name)
+        
+        # Serve media files directly from their relative paths (e.g. /images/file.png)
+        # in addition to the legacy /media/ prefix for backward compatibility.
+        md_path = self.config_manager.config['local']['md_path']
+        _images_path = self.config_manager.config['local']['images_path']
+        _images_rel = os.path.relpath(_images_path, md_path).replace('\\', '/')
+        _videos_path = self.config_manager.config['local']['videos_path']
+        _videos_rel = os.path.relpath(_videos_path, md_path).replace('\\', '/')
+        _figures_path = self.config_manager.config['local']['figures_path']
+        _figures_rel = os.path.relpath(_figures_path, md_path).replace('\\', '/')
+
+        def _serve_media_dir(directory, filename):
+            file_path = os.path.join(directory, filename)
+            if not os.path.exists(file_path):
+                return "File not found", 404
+            return send_from_directory(directory, filename)
+
+        self.app.add_url_rule(
+            f'/{_images_rel}/<path:filename>',
+            endpoint='serve_images_direct',
+            view_func=self._check_password(lambda filename, d=_images_path: _serve_media_dir(d, filename))
+        )
+        self.app.add_url_rule(
+            f'/{_videos_rel}/<path:filename>',
+            endpoint='serve_videos_direct',
+            view_func=self._check_password(lambda filename, d=_videos_path: _serve_media_dir(d, filename))
+        )
+        self.app.add_url_rule(
+            f'/{_figures_rel}/<path:filename>',
+            endpoint='serve_figures_direct',
+            view_func=self._check_password(lambda filename, d=_figures_path: _serve_media_dir(d, filename))
+        )
         
         @self.app.route('/api/markdown_preview', methods=['POST'])
         @self._check_password

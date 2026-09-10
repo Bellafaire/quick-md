@@ -97,7 +97,7 @@ function uploadImage(event) {
                 progressLabel.textContent = 'Upload complete!';
                 markdownLinkText = data.markdown_link;
                 document.getElementById('result-preview').innerHTML = 
-                    '<img src="/media/' + data.relative_path + '" style="max-width: 100%; max-height: 300px; border-radius: 4px; margin-bottom: 1rem;">';
+                    '<img src="/' + data.relative_path + '" style="max-width: 100%; max-height: 300px; border-radius: 4px; margin-bottom: 1rem;">';
                 document.getElementById('markdown-link').textContent = data.markdown_link;
                 document.getElementById('result-card').style.display = 'block';
                 event.target.reset();

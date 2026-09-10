@@ -139,7 +139,7 @@ function uploadVideo(event) {
                 progressLabel.textContent = 'Upload complete — processing in background';
                 videoTagText = data.video_tag;
                 document.getElementById('result-preview').innerHTML = 
-                    '<video controls style="max-width: 100%; max-height: 300px; border-radius: 4px; margin-bottom: 1rem;"><source src="/media/' + data.relative_path + '" type="video/webm"></video>';
+                    '<video controls style="max-width: 100%; max-height: 300px; border-radius: 4px; margin-bottom: 1rem;"><source src="/' + data.relative_path + '" type="video/webm"></video>';
                 document.getElementById('video-tag').textContent = data.video_tag;
                 document.getElementById('result-card').style.display = 'block';
                 event.target.reset();

@@ -12,10 +12,10 @@
 <div class="grid">
     {% for image in images %}
     <div class="media-item">
-        <img src="/media/{{ image }}" alt="{{ image }}">
+        <img src="/{{ image }}" alt="{{ image }}">
         <p style="font-weight: 600; margin-bottom: 0.5rem;">{{ image.split('/')[-1] }}</p>
-        <div class="code-display">![alt text]({{ image }})</div>
-        <button onclick="copyToClipboard('![alt text]({{ image }})')" class="btn" style="margin-top: 0.5rem; width: 100%;">Copy Markdown</button>
+        <div class="code-display">![alt text](/{{ image }})</div>
+        <button onclick="copyToClipboard('![alt text](/{{ image }})')" class="btn" style="margin-top: 0.5rem; width: 100%;">Copy Markdown</button>
     </div>
     {% endfor %}
 </div>
