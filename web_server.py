@@ -341,7 +341,6 @@ class WebServer:
             return {
                 'password_protected': self.password is not None,
                 'notebook_title': notebook_title,
-                'theme': theme,
                 'theme_json': json.dumps(theme),
                 'default_image_width': default_image_width,
             }
@@ -727,6 +726,18 @@ class WebServer:
             endpoint='serve_figures_direct',
             view_func=self._check_password(lambda filename, d=_figures_path: _serve_media_dir(d, filename))
         )
+        
+        @self.app.route('/style.css')
+        def style_css():
+            notebook_dir = os.path.dirname(self.config_manager.config_path)
+            custom_css = os.path.join(notebook_dir, '.qmd.css')
+            if os.path.exists(custom_css):
+                with open(custom_css, 'r') as f:
+                    return f.read(), 200, {'Content-Type': 'text/css'}
+            templates_dir = os.path.join(os.path.dirname(__file__), 'templates')
+            default_css = os.path.join(templates_dir, 'style.css')
+            with open(default_css, 'r') as f:
+                return f.read(), 200, {'Content-Type': 'text/css'}
         
         @self.app.route('/api/markdown_preview', methods=['POST'])
         @self._check_password
