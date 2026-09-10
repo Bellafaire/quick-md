@@ -36,6 +36,30 @@ class WebServer:
                 return redirect(url_for('login'))
             return f(*args, **kwargs)
         return decorated_function
+
+    def _fix_lists(self, content):
+        """Insert blank lines before lists that immediately follow paragraphs.
+
+        Python-Markdown requires a blank line between a paragraph and a
+        subsequent list. This preprocessor makes the common pattern of
+        'text:\n- item' work correctly.
+        """
+        lines = content.split('\n')
+        result = []
+        for i, line in enumerate(lines):
+            result.append(line)
+            if i + 1 < len(lines):
+                next_line = lines[i + 1]
+                stripped = line.strip()
+                # Current line is non-empty, root-level text (not list/header/blockquote)
+                if stripped and not stripped.startswith(('#', '-', '*', '+', '>')) and not re.match(r'^\d+\.', stripped):
+                    if line and not line[0].isspace():
+                        next_stripped = next_line.strip()
+                        # Next line is a root-level list item
+                        if (re.match(r'^[-*+][ \t]+', next_stripped) or re.match(r'^\d+\.[ \t]+', next_stripped)):
+                            if next_line and not next_line[0].isspace():
+                                result.append('')
+        return '\n'.join(result)
     
     def _fix_media_paths(self, html_content):
         """Convert relative and legacy /media/ paths to absolute root-relative paths.
@@ -362,6 +386,7 @@ class WebServer:
             with open(filepath, 'r') as f:
                 content = f.read()
             
+            content = self._fix_lists(content)
             html_content = markdown.markdown(content, extensions=['extra'])
             html_content = self._fix_media_paths(html_content)
             
@@ -707,6 +732,7 @@ class WebServer:
         @self._check_password
         def markdown_preview():
             content = request.json.get('content', '')
+            content = self._fix_lists(content)
             html = markdown.markdown(content, extensions=['extra'])
             html = self._fix_media_paths(html)
             return jsonify({'html': html})
