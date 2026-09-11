@@ -12,7 +12,7 @@
 <div class="grid">
     {% for video in videos %}
     <div class="media-item">
-        <video width="100%" controls>
+        <video width="100%" controls loading="lazy" preload="none">
             <source src="/{{ video }}" type="video/mp4">
         </video>
         <p style="font-weight: 600; margin-bottom: 0.5rem;">{{ video.split('/')[-1] }}</p>

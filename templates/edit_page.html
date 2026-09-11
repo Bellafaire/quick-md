@@ -132,6 +132,12 @@
         padding: 1.5rem 0.5rem;
     }
 
+    /* Invisible sentinel for IntersectionObserver infinite scroll */
+    .media-load-more-sentinel {
+        height: 1px;
+        width: 100%;
+    }
+
     .sidebar-media-item {
         display: flex;
         align-items: center;
@@ -630,12 +636,19 @@ let view = null;
 const vimCompartment = new Compartment();
 let vimModeEnabled = false;
 let previewVisible = false;
-let mediaData = { images: [], videos: [], drawio: [], pages: [] };
 let lastSavedContent = '';
 let autoSaveInterval = null;
 let currentSidebarTab = 'all';
 let previewTimeout = null;
 let mediaRefreshTimer = null;
+// Lazy-loading state for the media sidebar. Items are fetched in pages
+// from /api/media_list and appended as the user scrolls.
+let mediaItems = [];      // accumulated items for the current tab
+let mediaTotal = 0;       // total items matching the current tab+query on the server
+let mediaOffset = 0;      // items already fetched
+const MEDIA_PAGE_SIZE = 30;
+let mediaLoading = false; // true while a fetch is in flight
+let mediaSearchQuery = '';
 
 // ---- Editor theme (built from the configured palette) ----
 
@@ -791,22 +804,102 @@ function switchSidebarTab(tab) {
     document.querySelectorAll('.sidebar-tab').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-tab') === tab);
     });
-    renderSidebarMedia();
+    // Reset and re-fetch for the new tab.
+    loadMedia();
 }
 
+// Reset pagination state and fetch the first page of items for the
+// current tab and search query. Called on tab switch, search change,
+// initial load, and after uploads.
 function loadMedia() {
-    fetch('/api/media_list')
+    mediaItems = [];
+    mediaOffset = 0;
+    mediaLoading = false;
+    mediaSearchQuery = (document.getElementById('media-search').value || '').toLowerCase().trim();
+    fetchMediaPage();
+}
+
+// Fetch one page of items from the server and append them to
+// mediaItems. The first page also replaces the container contents;
+// subsequent pages append.
+function fetchMediaPage() {
+    if (mediaLoading) return;
+    // If we've already fetched everything, skip.
+    if (mediaOffset >= mediaTotal && mediaOffset > 0) return;
+    mediaLoading = true;
+    const params = new URLSearchParams({
+        tab: currentSidebarTab,
+        offset: mediaOffset,
+        limit: MEDIA_PAGE_SIZE,
+    });
+    if (mediaSearchQuery) params.set('q', mediaSearchQuery);
+    fetch('/api/media_list?' + params.toString())
         .then(response => response.json())
         .then(data => {
-            mediaData = data;
+            mediaTotal = data.total;
+            const newItems = data.items || [];
+            mediaItems = mediaItems.concat(newItems);
+            mediaOffset = mediaItems.length;
+            mediaLoading = false;
             renderSidebarMedia();
             scheduleProcessingRefresh();
+            // Show/hide the load-more sentinel depending on whether there
+            // are more items on the server.
+            updateLoadMoreSentinel();
         })
         .catch(error => {
             console.error('Error loading media:', error);
-            document.getElementById('media-list').innerHTML =
-                '<div class="sidebar-media-empty">Error loading media</div>';
+            mediaLoading = false;
+            const container = document.getElementById('media-list');
+            if (mediaItems.length === 0) {
+                container.innerHTML = '<div class="sidebar-media-empty">Error loading media</div>';
+            }
         });
+}
+
+// Ensure a hidden sentinel element exists at the bottom of the media list
+// for IntersectionObserver-driven infinite scroll.
+function updateLoadMoreSentinel() {
+    const container = document.getElementById('media-list');
+    let sentinel = container.querySelector('.media-load-more-sentinel');
+    const hasMore = mediaOffset < mediaTotal;
+    if (hasMore) {
+        if (!sentinel) {
+            sentinel = document.createElement('div');
+            sentinel.className = 'media-load-more-sentinel';
+            container.appendChild(sentinel);
+        }
+    } else if (sentinel) {
+        sentinel.remove();
+    }
+}
+
+// IntersectionObserver that triggers loading the next page when the
+// sentinel element becomes visible.
+let mediaScrollObserver = null;
+function initMediaScrollObserver() {
+    if (mediaScrollObserver) mediaScrollObserver.disconnect();
+    const listEl = document.getElementById('media-list');
+    mediaScrollObserver = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+            if (entry.isIntersecting && !mediaLoading) {
+                fetchMediaPage();
+            }
+        }
+    }, { root: listEl, rootMargin: '200px' });
+    // Observe the sentinel if it exists.
+    const sentinel = listEl.querySelector('.media-load-more-sentinel');
+    if (sentinel) mediaScrollObserver.observe(sentinel);
+}
+
+// After rendering the media list, reconnect the observer to the new sentinel.
+function reconnectMediaScrollObserver() {
+    if (mediaScrollObserver) mediaScrollObserver.disconnect();
+    const listEl = document.getElementById('media-list');
+    const sentinel = listEl.querySelector('.media-load-more-sentinel');
+    if (sentinel && mediaScrollObserver) {
+        mediaScrollObserver.observe(sentinel);
+    }
 }
 
 // While any media item is still being encoded (ffmpeg running in the
@@ -814,46 +907,25 @@ function loadMedia() {
 // updates and the "Processing…" badge clears the moment the file appears.
 function scheduleProcessingRefresh() {
     if (mediaRefreshTimer) return;
-    const items = mediaData.images.concat(mediaData.videos).concat(mediaData.drawio);
-    if (!items.some(i => i.processing)) return;
+    if (!mediaItems.some(i => i.processing)) return;
     mediaRefreshTimer = setTimeout(() => {
         mediaRefreshTimer = null;
         loadMedia();
     }, 1000);
 }
 
+// Items are now fetched from the server with server-side search
+// and pagination; getFilteredMedia simply returns the accumulated
+// items (already filtered by the server).
 function getFilteredMedia() {
-    const query = (document.getElementById('media-search').value || '').toLowerCase().trim();
-    let items = [];
-    if (currentSidebarTab === 'all') {
-        items = mediaData.images.concat(mediaData.videos).concat(mediaData.drawio);
-    } else if (currentSidebarTab === 'images') {
-        items = mediaData.images;
-    } else if (currentSidebarTab === 'videos') {
-        items = mediaData.videos;
-    } else if (currentSidebarTab === 'drawio') {
-        items = mediaData.drawio;
-    } else if (currentSidebarTab === 'pages') {
-        items = mediaData.pages;
-    }
-    // Backend sorts each list by date desc; the combined "all" view needs a re-sort.
-    items = items.slice().sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    if (query) {
-        // Match against the filename and, for pages, the page title too.
-        items = items.filter(item => {
-            const name = (item.filename || '').toLowerCase();
-            const title = (item.title || '').toLowerCase();
-            return name.indexOf(query) !== -1 || title.indexOf(query) !== -1;
-        });
-    }
-    return items;
+    return mediaItems;
 }
 
 function renderSidebarMedia() {
     const container = document.getElementById('media-list');
     const items = getFilteredMedia();
 
-    if (items.length === 0) {
+    if (items.length === 0 && !mediaLoading) {
         container.innerHTML = '<div class="sidebar-media-empty">No media found</div>';
         return;
     }
@@ -865,7 +937,7 @@ function renderSidebarMedia() {
             .replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
-    container.innerHTML = items.map(item => {
+    let html = items.map(item => {
         const isPage = !!item.is_page;
         const processing = !!item.processing;
         const failed = !!item.failed;
@@ -898,10 +970,11 @@ function renderSidebarMedia() {
             insertTitle = displayName;
         } else {
             // Diagrams are SVGs, so they preview as images just like real images.
+            // Use loading="lazy" so off-screen thumbnails aren't fetched.
             const _path = item.path.startsWith('/') ? item.path : '/' + item.path;
             thumb = (item.is_video && !isDrawio)
-                ? `<video src="${escAttr(_path)}" class="sidebar-media-thumb" muted preload="metadata"></video>`
-                : `<img src="${escAttr(_path)}" class="sidebar-media-thumb" alt="${escAttr(item.filename)}">`;
+                ? `<video src="${escAttr(_path)}" class="sidebar-media-thumb" muted preload="none"></video>`
+                : `<img src="${escAttr(_path)}" class="sidebar-media-thumb" alt="${escAttr(item.filename)}" loading="lazy">`;
             statusLine = `<div class="sidebar-media-date">${escAttr(item.date)}</div>`;
             displayName = item.filename;
             kind = (item.is_video && !isDrawio) ? 'video' : 'image';
@@ -926,6 +999,18 @@ function renderSidebarMedia() {
         `;
     }).join('');
 
+    // Append sentinel for infinite scroll if there are more items to load.
+    if (mediaOffset < mediaTotal) {
+        html += '<div class="media-load-more-sentinel"></div>';
+    }
+
+    // Show a subtle loading indicator when more items are being fetched.
+    if (mediaLoading && mediaItems.length > 0) {
+        html += '<div class="sidebar-media-empty" style="padding:0.5rem;">Loading more…</div>';
+    }
+
+    container.innerHTML = html;
+
     container.querySelectorAll('.sidebar-media-insert[data-kind]').forEach(btn => {
         btn.addEventListener('click', function() {
             const path = this.getAttribute('data-path');
@@ -938,6 +1023,9 @@ function renderSidebarMedia() {
             }
         });
     });
+
+    // Reconnect the IntersectionObserver to the new sentinel.
+    reconnectMediaScrollObserver();
 }
 
 // Close upload modals when clicking outside
@@ -1263,16 +1351,16 @@ vimModeEnabled = localStorage.getItem('vimModeEnabled') === 'true';
 initEditor();
 
 loadMedia();
+initMediaScrollObserver();
 startAutoSave();
 
-// Media sidebar search: debounce so we only re-render after typing pauses,
-// instead of rebuilding the list on every keystroke. (The listener is
-// attached here rather than via an inline oninput= attribute because ES
-// module functions are not on the global scope that inline handlers see.)
+// Media sidebar search: debounce so we only re-fetch after typing pauses.
+// A changed query resets pagination and fetches fresh results from the
+// server (which now does server-side search).
 let mediaSearchTimer = null;
 document.getElementById('media-search').addEventListener('input', () => {
     clearTimeout(mediaSearchTimer);
-    mediaSearchTimer = setTimeout(renderSidebarMedia, 120);
+    mediaSearchTimer = setTimeout(() => { loadMedia(); }, 250);
 });
 
 window.addEventListener('beforeunload', stopAutoSave);

@@ -751,6 +751,19 @@ class WebServer:
         @self.app.route('/api/media_list')
         @self._check_password
         def media_list():
+            tab = request.args.get('tab', 'all')
+            try:
+                offset = int(request.args.get('offset', 0))
+            except (ValueError, TypeError):
+                offset = 0
+            try:
+                limit = int(request.args.get('limit', 30))
+            except (ValueError, TypeError):
+                limit = 30
+            # Cap limit to avoid accidental huge responses
+            limit = max(1, min(limit, 200))
+            query = request.args.get('q', '').strip().lower()
+
             images = self.config_manager.config.get('Images', [])
             videos = self.config_manager.config.get('Videos', [])
             diagrams = self.config_manager.config.get('Drawio', [])
@@ -762,11 +775,39 @@ class WebServer:
             for d in diagram_details:
                 d['is_drawio'] = True
             page_details = self._page_details()
+
+            if tab == 'images':
+                items = image_details
+            elif tab == 'videos':
+                items = video_details
+            elif tab == 'drawio':
+                items = diagram_details
+            elif tab == 'pages':
+                items = page_details
+            else:
+                # 'all' — media only (no pages); pages have their own tab
+                items = sorted(
+                    image_details + video_details + diagram_details,
+                    key=lambda x: x.get('timestamp', 0),
+                    reverse=True,
+                )
+
+            # Server-side search filter
+            if query:
+                items = [
+                    item for item in items
+                    if query in (item.get('filename') or '').lower()
+                    or query in (item.get('title') or '').lower()
+                ]
+
+            total = len(items)
+            items = items[offset:offset + limit]
+
             return jsonify({
-                'images': image_details,
-                'videos': video_details,
-                'drawio': diagram_details,
-                'pages': page_details,
+                'items': items,
+                'total': total,
+                'offset': offset,
+                'limit': limit,
             })
     
     def start(self):
