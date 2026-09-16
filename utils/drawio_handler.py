@@ -132,6 +132,8 @@ def create_markdown_link(alt_text, relative_path):
     """Generate a markdown image link for a .drawio.svg diagram.
 
     Because .drawio.svg files are real SVGs, a normal markdown image link
-    renders them inline in the rendered page.
+    renders them inline in the rendered page. Uses a relative path (no
+    leading slash) for offline markdown viewer compatibility.
     """
-    return f"![{alt_text}]({relative_path})"
+    path = relative_path.lstrip('/')
+    return f"![{alt_text}]({path})"

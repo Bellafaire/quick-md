@@ -280,6 +280,12 @@ theme:
 - All paths in the `local` section are stored as **relative paths** and automatically resolved to absolute paths at runtime
 - Media paths (images/videos) are auto-detected based on where files are uploaded
 - The config file maintains backward compatibility with older formats
+- **Media links use relative paths in markdown, root-relative in the web view.**
+  The markdown source stores relative paths like `images/photo.png` (no leading slash)
+  so files render correctly in offline markdown viewers. When rendering HTML, the
+  server converts them to root-relative paths like `/images/photo.png` so they work
+  under the `/page/<filename>` URL scheme. A legacy `/media/` prefix is also
+  supported for backward compatibility.
 
 ## Vendored / Offline Assets
 

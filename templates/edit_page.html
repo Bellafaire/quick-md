@@ -750,7 +750,10 @@ function togglePreview() {
 
 function insertMedia(path, isImage) {
     if (!view) return;
-    if (!path.startsWith('/')) path = '/' + path;
+    // Strip any leading slash so links use relative paths (e.g. "images/photo.png")
+    // which work in both the web viewer (thanks to <base href="/">) and offline
+    // markdown viewers that open files directly from disk.
+    path = path.replace(/^\/+/, '');
     let mediaText;
     const alt = path.split('/').pop().replace(/\.[^/.]+$/, '');
     if (isImage) {

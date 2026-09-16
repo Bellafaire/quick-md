@@ -12,6 +12,6 @@ def copy_image_to_destination(source_path, dest_path, create_dirs=True):
 
 
 def create_markdown_image_link(alt_text, relative_path):
-    """Generate a markdown image link with an absolute root-relative path."""
-    path = relative_path if relative_path.startswith('/') else '/' + relative_path
+    """Generate a markdown image link with a relative path."""
+    path = relative_path.lstrip('/')
     return f"![{alt_text}]({path})"

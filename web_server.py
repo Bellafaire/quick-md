@@ -62,11 +62,20 @@ class WebServer:
         return '\n'.join(result)
     
     def _fix_media_paths(self, html_content):
-        """Convert relative and legacy /media/ paths to absolute root-relative paths.
+        """Normalize media paths to root-relative paths for the web view.
 
-        - src="images/..." -> src="/images/..."
-        - src="/media/images/..." -> src="/images/..."
-        - Already absolute paths (other than /media/) are left alone.
+        Markdown files store relative paths (e.g. ``images/photo.png``) so they
+        render correctly in offline markdown viewers.  The Flask web server needs
+        root-relative paths (e.g. ``/images/photo.png``) because pages are served
+        under ``/page/<filename>`` — a bare relative path would resolve against
+        the page URL, not the site root.
+
+        This function is called on rendered HTML, not on the markdown source, so
+        the offline-friendly relative paths stay intact in the ``.md`` files.
+
+        - src="images/..." -> src="/images/..."     (add leading slash)
+        - src="/media/images/..." -> src="/images/..."  (strip legacy /media/ prefix)
+        - Already root-relative paths (other than /media/) are left alone.
         - External URLs (http://...) are left alone.
         """
         def _normalize(path):
@@ -655,7 +664,7 @@ class WebServer:
             relative_path = f"{relative_dir}/{filename}"
             self.config_manager.add_drawio_to_config(relative_path)
 
-            markdown_link = f"![{title}](/{relative_path})"
+            markdown_link = f"![{title}]({relative_path.lstrip('/')})"
             return jsonify({
                 'success': True,
                 'message': 'Diagram saved successfully',
