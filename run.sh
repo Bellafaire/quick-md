@@ -119,6 +119,7 @@ if [[ $NEED_BUILD -eq 1 ]]; then
     docker build \
         --build-arg USER_ID="$USER_ID" \
         --build-arg GROUP_ID="$GROUP_ID" \
+        --no-cache \
         -t "$IMAGE" \
         "$SCRIPT_DIR"
 fi
