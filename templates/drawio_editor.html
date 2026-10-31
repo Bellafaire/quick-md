@@ -5,10 +5,11 @@
 {% block nav_title %}{{ page_title }}{% endblock %}
 
 {% block nav_controls %}
+    <span id="autosave-status" class="drawio-autosave-status">{% if filename %}Auto-save enabled{% else %}Auto-save starts after first save{% endif %}</span>
     <span id="saving-badge" class="drawio-saving-badge" style="margin-left:0;"></span>
     <button onclick="saveDiagram(false)" class="btn">Save</button>
     <button onclick="saveDiagram(true)" class="btn">Save &amp; Close</button>
-    <a href="/drawio" class="btn btn-secondary">Cancel</a>
+    <a href="/drawio" class="btn btn-secondary" onclick="return cancelEditing();">Cancel</a>
 {% endblock %}
 
 {% block extra_css %}
@@ -96,6 +97,18 @@
     .drawio-saving-badge.visible { opacity: 1; }
     .drawio-saving-badge.ok { color: var(--c-ok); }
     .drawio-saving-badge.err { color: var(--c-err); }
+    /* Persistent autosave status (mirrors the page editor's indicator):
+       shows the last save time, flashing green for a moment. */
+    .drawio-autosave-status {
+        font-size: 0.85rem;
+        white-space: nowrap;
+        color: var(--c-muted);
+        transition: color 0.4s;
+    }
+    .drawio-autosave-status.ok {
+        color: var(--c-ok);
+        transition: none;
+    }
 </style>
 {% endblock %}
 
@@ -147,6 +160,18 @@ let editorReady = false;
 // The last diagram XML we've seen (kept in sync via export responses) so we
 // can inject it as a fallback if an export SVG ever lacks its own embedding.
 let lastSeenXml = '';
+// The diagram XML we last SUCCEEDED in saving. Autosave compares against
+// this so a minute with no edits doesn't produce a pointless write, and the
+// beforeunload/Cancel guards use the difference as a "dirty" check.
+let lastSavedXml = IS_NEW ? '' : (INITIAL_XML || '');
+// A save (export -> POST) roundtrip is in flight; further exports wait.
+let saveInFlight = false;
+// Set while saving on behalf of an autosave tick (drives badge text and the
+// skip-if-unchanged check).
+let autoSaveRunning = false;
+// The current save was requested as a leave-the-editor action (:exit event
+// or Save & Close): redirect to the diagram list once it succeeds.
+let closeAfterSave = false;
 
 function postToEditor(msg) {
     iframe.contentWindow.postMessage(JSON.stringify(msg), '*');
@@ -158,6 +183,20 @@ function showBadge(text, kind) {
     b.className = 'drawio-saving-badge visible' + (kind ? ' ' + kind : '');
     if (kind !== 'err') {
         setTimeout(() => { b.classList.remove('visible'); }, 2500);
+    }
+}
+
+// ---- Autosave status indicator (mirrors the page editor) ----
+
+// Update the persistent status span in the nav. `ok` flashes the text green
+// for a moment; the text itself stays until the next save.
+function updateAutosaveStatus(text, ok) {
+    const el = document.getElementById('autosave-status');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('ok', !!ok);
+    if (ok) {
+        setTimeout(() => el.classList.remove('ok'), 2000);
     }
 }
 
@@ -195,13 +234,20 @@ window.addEventListener('message', function(evt) {
             handleExportedSvg(msg.data, msg.xml);
         }
     } else if (msg.event === 'exit') {
-        // User hit an in-editor close action; go back to the list.
-        window.location.href = '/drawio';
+        // User hit an in-editor exit action (draw.io File > Exit / Ctrl+Q):
+        // always save before leaving so no diagram edits are lost. If there is
+        // nothing to save yet (editor still loading, or an untitled new
+        // diagram), just leave.
+        if (!saveDiagram(true)) {
+            window.location.href = '/drawio';
+        }
     }
 });
 
 // Save flow: ask draw.io for an SVG that embeds its own diagram source.
-function requestExport() {
+// `spin` is shown as a spinner key inside the draw.io UI; pass null for
+// background saves (autosave) so the editor is never interrupted visually.
+function requestExport(spin = 'Saving…') {
     if (!editorReady) {
         showMessage('Editor is still loading, please wait…', true);
         return false;
@@ -210,7 +256,7 @@ function requestExport() {
         action: 'export',
         format: 'xmlsvg',
         asText: true,
-        spin: 'Saving…',
+        spin: spin,
     });
     return true;
 }
@@ -221,21 +267,30 @@ function saveDiagram(closeAfter) {
         if (!title) {
             showMessage('Please enter a diagram title first.', true);
             document.getElementById('diagram-title').focus();
-            return;
+            return false;
         }
     }
     showBadge('Saving…');
-    if (!requestExport()) return;
-    window._closeAfterSave = closeAfter;
+    if (!requestExport()) return false;
+    closeAfterSave = closeAfter;
+    autoSaveRunning = false;
+    return true;
 }
 
-let _pendingSvg = null;
-let _pendingXml = null;
 function handleExportedSvg(svg, xml) {
-    _pendingSvg = svg;
-    _pendingXml = xml;
+    if (saveInFlight) {
+        // A save is already on its way to the server; drop this export. The
+        // next autosave tick (or a manual save) picks up the newer state.
+        autoSaveRunning = false;
+        return;
+    }
+    saveInFlight = true;
     if (IS_NEW) {
         saveNew(svg, xml);
+    } else if (autoSaveRunning && xml && xml === lastSavedXml) {
+        // Nothing changed since the last save — skip the request silently.
+        autoSaveRunning = false;
+        saveInFlight = false;
     } else {
         saveExisting(svg, xml);
     }
@@ -250,17 +305,23 @@ function saveNew(svg, xml) {
     })
     .then(r => r.json())
     .then(data => {
+        saveInFlight = false;
         if (data.success) {
+            lastSavedXml = xml || '';
             showBadge('Saved', 'ok');
             showMessage(data.message);
             // We've now created the file; further saves must update it in place.
-            window.location.href = '/edit_drawio/' + encodeURIComponent(data.relative_path);
+            // An exit-triggered save goes to the diagram list instead.
+            window.location.href = closeAfterSave
+                ? '/drawio'
+                : '/edit_drawio/' + encodeURIComponent(data.relative_path);
         } else {
             showBadge('Save failed', 'err');
             showMessage(data.message, true);
         }
     })
     .catch(err => {
+        saveInFlight = false;
         showBadge('Save failed', 'err');
         showMessage('Network error: ' + err, true);
     });
@@ -274,21 +335,80 @@ function saveExisting(svg, xml) {
     })
     .then(r => r.json())
     .then(data => {
+        saveInFlight = false;
+        const wasAutoSave = autoSaveRunning;
+        autoSaveRunning = false;
         if (data.success) {
-            showBadge('Saved', 'ok');
-            showMessage(data.message);
-            if (window._closeAfterSave) {
+            lastSavedXml = xml || '';
+            const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            if (wasAutoSave) {
+                updateAutosaveStatus('✓ Auto-saved at ' + t, true);
+            } else {
+                updateAutosaveStatus('✓ Saved at ' + t, true);
+                showMessage(data.message);
+            }
+            if (closeAfterSave) {
                 window.location.href = '/drawio';
             }
         } else {
-            showBadge('Save failed', 'err');
+            showBadge(wasAutoSave ? 'Autosave failed' : 'Save failed', 'err');
             showMessage(data.message, true);
         }
     })
     .catch(err => {
-        showBadge('Save failed', 'err');
+        saveInFlight = false;
+        const failedAutoSave = autoSaveRunning;
+        autoSaveRunning = false;
+        showBadge(failedAutoSave ? 'Autosave failed' : 'Save failed', 'err');
         showMessage('Network error: ' + err, true);
     });
+}
+
+// ---- Autosave: like the page editor, but every minute ----
+
+// Each tick exports the current diagram and saves it — but only if an export
+// roundtrip shows the XML actually changed since the last save, so idle
+// diagrams produce no writes. New diagrams (no filename yet) don't autosave:
+// they enter the normal loop once their first save redirects to the editor
+// for the created file.
+function autosaveTick() {
+    if (IS_NEW || !editorReady || saveInFlight) return;
+    autoSaveRunning = true;
+    if (!requestExport(null)) {
+        autoSaveRunning = false;
+    }
+}
+
+setInterval(autosaveTick, 60000);
+
+// ---- Leaving the editor ----
+
+// Set when leaving is already user-confirmed (Cancel after its discard
+// prompt) so beforeunload does not ask a second time.
+let suppressUnloadWarning = false;
+
+// Warn before the tab closes / navigates away while the diagram may hold
+// unsaved edits. The check compares the most recent export's XML with the
+// last saved one, so it can lag one autosave interval behind reality.
+window.addEventListener('beforeunload', function(e) {
+    if (suppressUnloadWarning) return;
+    if (!IS_NEW && editorReady && lastSeenXml && lastSeenXml !== lastSavedXml) {
+        e.preventDefault();
+        e.returnValue = '';
+        return e.returnValue;
+    }
+});
+
+// Cancel deliberately discards, but double-check first when the diagram has
+// unsaved edits (Exit / Save & Close always save first, this does not).
+function cancelEditing() {
+    if (!IS_NEW && editorReady && lastSeenXml && lastSeenXml !== lastSavedXml
+        && !confirm('Diagram has unsaved changes. Discard them?')) {
+        return false;
+    }
+    suppressUnloadWarning = true;
+    window.location.href = '/drawio';
+    return true;
 }
 
 // Ctrl/Cmd+S inside the host page triggers a save (keeps editor open).
@@ -301,5 +421,6 @@ window.addEventListener('keydown', function(e) {
 
 // Expose for the inline onclick handlers (they run in global scope).
 window.saveDiagram = saveDiagram;
+window.cancelEditing = cancelEditing;
 </script>
 {% endblock %}

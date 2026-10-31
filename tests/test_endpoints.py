@@ -336,7 +336,11 @@ class TestEditorInsertionHelpers:
         """Return one top-level function's source (definition .. next def)."""
         marker = f"function {name}"
         start = page.index(marker)
-        end = page.index("function ", start + len(marker))
+        try:
+            end = page.index("function ", start + len(marker))
+        except ValueError:
+            # Last function on the page: run through the closing script tag.
+            end = page.index("</script>", start)
         body = page[start:end]
         # Drop line comments so tests assert on code, not prose.
         return re.sub(r"^\s*//.*$", "", body, flags=re.MULTILINE)
@@ -719,6 +723,108 @@ class TestDrawioHandler:
         from utils.drawio_handler import write_embedded_svg
         with pytest.raises(ValueError, match="not a valid SVG"):
             write_embedded_svg("hello world", "/dev/null")
+
+
+class TestDrawioEditorAutosave:
+    """The draw.io editor autosaves and never exits without saving.
+
+    Diagram edits live inside the cross-origin draw.io iframe, reachable only
+    via the export roundtrip, so the behaviour is pinned by rendering
+    /edit_drawio/<file> and inspecting the page's JavaScript:
+
+      - a 60s autosave tick exports and saves only existing diagrams, and
+        skips the request when the XML is unchanged;
+      - the draw.io 'exit' event routes through saveDiagram() so the diagram
+        is saved before the redirect (plain redirect only when nothing can
+        be saved — editor still loading or untitled new diagram);
+      - Cancel and beforeunload guard against losing unsaved edits.
+    """
+
+    _SVG = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">'
+        '<rect width="100" height="100" fill="red"/>'
+        "</svg>"
+    )
+
+    def _editor_page(self, app_client):
+        resp = app_client.post(
+            "/save_drawio_new",
+            json={
+                "title": "Autosave Diagram",
+                "svg": self._SVG,
+                "xml": "<mxGraphModel><root/></mxGraphModel>",
+            },
+        )
+        assert resp.status_code == 200
+        rel = resp.get_json()["relative_path"]
+        page = app_client.get("/edit_drawio/" + rel)
+        assert page.status_code == 200
+        return page.data.decode()
+
+    def test_autosave_ticks_every_minute(self, app_client):
+        page = self._editor_page(app_client)
+        assert "setInterval(autosaveTick, 60000)" in page
+        tick = TestEditorInsertionHelpers._function_body(page, "autosaveTick")
+        # New diagrams (no filename yet) never autosave into existence.
+        assert "IS_NEW" in tick
+        assert "requestExport(" in tick
+
+    def test_autosave_skips_unchanged_diagrams(self, app_client):
+        """A tick whose export matches the last saved XML must not POST."""
+        page = self._editor_page(app_client)
+        handler = TestEditorInsertionHelpers._function_body(page, "handleExportedSvg")
+        assert "autoSaveRunning && xml && xml === lastSavedXml" in handler
+        # The unchanged path clears the in-flight flag and does not fetch.
+        skip = handler[handler.index("xml === lastSavedXml"):handler.index("saveExisting")]
+        assert "saveInFlight = false" in skip
+        assert "fetch(" not in skip
+
+    def test_exit_event_saves_before_leaving(self, app_client):
+        page = self._editor_page(app_client)
+        i = page.index("msg.event === 'exit'")
+        branch = page[i:i + 800]
+        assert "saveDiagram(true)" in branch
+        # The save attempt happens before the (fallback) navigation.
+        assert branch.index("saveDiagram(true)") < branch.index("window.location.href")
+
+    def test_exit_save_redirects_to_diagram_list(self, app_client):
+        """Save & Close (and exit-triggered saves) land on /drawio: the
+        existing-file path after success, and the new-file path too (instead
+        of redirecting into a fresh editor session)."""
+        page = self._editor_page(app_client)
+        existing = TestEditorInsertionHelpers._function_body(page, "saveExisting")
+        assert existing.index("closeAfterSave") < existing.index("'/drawio'")
+        new = TestEditorInsertionHelpers._function_body(page, "saveNew")
+        compact = re.sub(r"\s+", " ", new)
+        assert "closeAfterSave ? '/drawio' : '/edit_drawio/'" in compact
+
+    def test_cancel_and_unload_guard_unsaved_changes(self, app_client):
+        page = self._editor_page(app_client)
+        cancel = TestEditorInsertionHelpers._function_body(page, "cancelEditing")
+        assert "lastSeenXml !== lastSavedXml" in cancel
+        assert "confirm(" in cancel
+        assert 'onclick="return cancelEditing();"' in page
+        unload = page[page.index("addEventListener('beforeunload'"):]
+        unload = unload[:unload.index("\n}")]
+        assert "lastSeenXml !== lastSavedXml" in unload
+        assert "preventDefault()" in unload
+
+    def test_autosave_status_indicator(self, app_client):
+        """The nav shows a persistent autosave status like the page editor's.
+        Existing diagrams start as 'Auto-save enabled'; success updates it to
+        '✓ Auto-saved at HH:MM' / '✓ Saved at HH:MM' via updateAutosaveStatus
+        (with a green .ok flash that reverts)."""
+        page = self._editor_page(app_client)
+        assert 'id="autosave-status"' in page
+        assert "Auto-save enabled" in page
+        # New diagrams: autosave only kicks in after the first save.
+        new_page = app_client.get("/new_drawio").data.decode()
+        assert "Auto-save starts after first save" in new_page
+        fn = TestEditorInsertionHelpers._function_body(page, "updateAutosaveStatus")
+        assert "classList.toggle('ok'" in fn or 'classList.toggle("ok"' in fn
+        save_existing = TestEditorInsertionHelpers._function_body(page, "saveExisting")
+        assert "updateAutosaveStatus('✓ Auto-saved at ' + t, true)" in save_existing
+        assert "updateAutosaveStatus('✓ Saved at ' + t, true)" in save_existing
 
 
 class TestPasswordProtection:
