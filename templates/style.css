@@ -390,6 +390,48 @@ label {
     border-radius: 4px;
 }
 
+/* ---- Markdown tables: centered and readable ----
+
+   Tables shrink to fit their content, sit centered in the page, and gain
+   padding, bold headers, thin vertical dividers between columns, and a
+   single rule under the header row. Wide tables scroll in place instead of
+   breaking the page layout (display:block + fit-content + overflow-x). */
+.markdown-content table {
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    overflow-x: auto;
+    margin: 1rem auto;
+    border-collapse: collapse;
+}
+
+.markdown-content th,
+.markdown-content td {
+    padding: 0.5rem 1rem;
+    /* Body cells default to left-aligned; per-column alignment written
+       by markdown (|:---:|) wins because it arrives as an inline style. */
+    text-align: left;
+    /* Vertical dividers between columns only (first column opens the row). */
+    border-left: 1px solid var(--c-border);
+}
+
+.markdown-content th:first-child,
+.markdown-content td:first-child {
+    border-left: none;
+}
+
+.markdown-content th {
+    font-weight: 700;
+    /* Header text defaults to centered; markdown per-column alignment
+       (e.g. |:---| or ---:|) still wins because it arrives inline. */
+    text-align: center;
+}
+
+.markdown-content thead th {
+    /* The one horizontal line: separates the header row from the body. */
+    border-bottom: 2px solid var(--c-border);
+}
+
 .split-view {
     display: grid;
     grid-template-columns: 1fr 1fr;

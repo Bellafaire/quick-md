@@ -688,15 +688,21 @@ function editorHighlightStyle(c) {
 // ---- Editor setup ----
 
 function buildExtensions() {
+    // The vim compartment must come FIRST. DOM key handlers run in the order
+    // their extensions are registered, and basicSetup's keymaps bind
+    // Mod-d (searchKeymap -> selectNextOccurrence) and Mod-u (historyKeymap ->
+    // undoSelection), which would swallow Ctrl+d / Ctrl+u before the Vim
+    // keymap's <C-d> / <C-u> half-page scroll motions ever see them.
+    // vimCompartment is toggled at runtime via this compartment; with Vim off
+    // the list is empty and nothing changes.
     return [
+        vimCompartment.of(vimModeEnabled ? vim({ status: true }) : []),
         basicSetup,
         editorTheme(THEME),
         editorHighlightStyle(THEME),
         markdown(),
         EditorView.lineWrapping,
         keymap.of([...defaultKeymap, indentWithTab]),
-        // Vim is toggled at runtime via this compartment.
-        vimCompartment.of(vimModeEnabled ? vim({ status: true }) : []),
         EditorView.updateListener.of(update => {
             if (update.docChanged) {
                 clearTimeout(previewTimeout);
@@ -762,7 +768,8 @@ function insertMedia(path, isImage) {
         // Diagrams are SVGs so they render exactly like images.
         mediaText = `<img src="${path}" width="${DEFAULT_IMAGE_WIDTH}" alt="${alt}" style="display:block; margin:0 auto;">`;
     } else {
-        mediaText = `<video width="640" loop autoplay controls><source src="${path}" type="video/webm"></video>`;
+        // Videos: centered via inline style so they match the <img> tags.
+        mediaText = `<video width="640" loop autoplay controls style="display:block; margin:0 auto;"><source src="${path}" type="video/webm"></video>`;
     }
     view.focus();
     view.dispatch(view.state.replaceSelection(mediaText));
@@ -772,7 +779,12 @@ function insertMedia(path, isImage) {
 
 function insertPageLink(path, title) {
     if (!view) return;
-    const link = `[${title}](${path})`;
+    // Convert a root-relative path ("/page.md") into a relative one ("page.md")
+    // so the markdown link works when viewed in the web viewer (it resolves
+    // against /page/<filename> and is picked up by the /page/ route) and in
+    // offline markdown viewers opened straight from disk.
+    const rel = path.replace(/^\/+/, '');
+    const link = `[${title}](${rel})`;
     view.focus();
     view.dispatch(view.state.replaceSelection(link));
     if (previewVisible) updatePreview();
