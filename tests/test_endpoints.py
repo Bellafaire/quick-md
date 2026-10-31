@@ -827,6 +827,85 @@ class TestDrawioEditorAutosave:
         assert "updateAutosaveStatus('✓ Saved at ' + t, true)" in save_existing
 
 
+class TestSyntaxHighlighting:
+    """Fenced-code syntax highlighting in the viewer.
+
+    Code fences like ```py, ```cpp, ```bash, ```xml, ```yaml are highlighted
+    server-side by the codehilite extension + Pygments and rendered as
+    div.codehilite > pre > code with token classes. Fences without a known
+    hint stay plain, and installs without the optional Pygments dependency
+    fall back to the previous unhighlighted output without errors.
+    """
+
+    def _preview(self, app_client, content):
+        resp = app_client.post("/api/markdown_preview", json={"content": content})
+        assert resp.status_code == 200
+        return resp.get_json()["html"]
+
+    def test_all_requested_languages_highlight(self, app_client):
+        hints_tokens = {
+            "py": ("import os\n", ('"kn"', '"nn"')),
+            "cpp": ("int main() { return 0; }\n", ('"k"', '"nf"', '"mi"')),
+            "bash": ('echo "shell"\n', ('"nb"', '"s2"')),
+            "xml": ('<a href="x"/>\n', ('"nt"', '"na"')),
+            "yaml": ("key: value\n", ('"nt"',)),
+        }
+        for hint, (code, markers) in hints_tokens.items():
+            html = self._preview(app_client, f"```{hint}\n{code}```")
+            assert '<div class="codehilite">' in html, hint
+            for marker in markers:
+                assert marker in html, f"{hint}: expected token {marker}"
+
+    def test_alias_hints_also_work(self, app_client):
+        """Common aliases (python, c++, sh, yml) resolve to the same lexers."""
+        for hint, code, marker in [
+            ("python", "for i in range(3): pass\n", '"k"'),
+            ("c++", "int main() {}\n", '"kt"'),
+            ("sh", "echo hi\n", '"nb"'),
+            ("yml", "key: 1\n", '"nt"'),
+        ]:
+            html = self._preview(app_client, f"```{hint}\n{code}```")
+            assert marker in html, hint
+
+    def test_unknown_hint_and_no_hint_stay_plain(self, app_client):
+        html = self._preview(app_client, "```weirdlang\nplain text\n```")
+        assert "<span class=" not in html
+        html = self._preview(app_client, "```\nplain text\n```")
+        assert "<span class=" not in html
+
+    def test_view_page_highlights_code(self, app_client):
+        """The viewer route gets the same highlighting as the preview API."""
+        content = ("# Highlight Test\n\n```py\nimport os\n```\n")
+        resp = app_client.post("/save/main.md", data={"content": content})
+        assert resp.status_code == 200
+        resp = app_client.get("/page/main.md")
+        html = resp.data.decode()
+        assert '<div class="codehilite">' in html
+        assert '"nn"' in html  # import <module>
+
+    def test_preview_fallback_without_pygments(self, app_client, monkeypatch):
+        """A deployment missing the optional Pygments dependency still renders
+        plain fenced code (the pre-highlighting behaviour)."""
+        import web_server as ws
+        monkeypatch.setattr(ws, "PYGMENTS_AVAILABLE", False)
+        html = self._preview(app_client, "```py\nimport os\n```")
+        assert '<div class="codehilite">' not in html
+        assert '<pre><code class="language-py">' in html
+        # media normalization still works through the shared renderer
+        resp = app_client.post("/api/markdown_preview",
+                               json={"content": "![alt](images/test_photo.png)"})
+        assert 'src="/images/test_photo.png"' in resp.get_json()["html"]
+
+    def test_style_css_has_codehilite_token_colors(self, app_client):
+        """The default stylesheet ships Pygments token colors and the
+        wrapping-code reset so highlighted blocks are colored out of the box."""
+        css = app_client.get("/style.css").data.decode()
+        assert re.search(r"\.markdown-content \.codehilite code\s*\{[^}]*background:\s*none", css)
+        for selector in (".codehilite .k", ".codehilite .s", ".codehilite .c1",
+                         ".codehilite .nt", ".codehilite .nb"):
+            assert selector in css, selector
+
+
 class TestPasswordProtection:
     """When a password is set, routes require auth."""
 

@@ -9,6 +9,7 @@ All markdown files are stored locally alongside images, videos, and draw.io diag
 - **Password Protection**: Optional password authentication for web access
 - **Configurable Title**: Customize your notebook's display name
 - **MathJax Support**: Write mathematical equations using `$` for inline math and `$$` for display equations
+- **Code Syntax Highlighting**: Fenced code blocks (```py, ```cpp, ```bash, ```xml, ```yaml, …) are highlighted in the viewer and live preview via Pygments — hundreds of languages, fully offline
 - **Fully Offline Editor**: The web editor (CodeMirror 6 + Vim keybindings) and MathJax are vendored locally — no CDN calls, so editing and math rendering keep working with no internet connection
 - **Configurable 3-Color Theme**: A 60/30/10 (base/surface/accent) theme configurable in `.qmd_conf`; text and borders auto-derive for any light or dark palette, and the editor matches
 - **Docker Support**: Run in a container with proper file ownership
@@ -197,6 +198,41 @@ Access the web interface at http://localhost:6580 in your browser (or your custo
 **Page Titles:**
 The web interface displays actual page titles (extracted from the first H1 heading) instead of filenames in the browser tab and page headers.
 
+### Code Syntax Highlighting
+
+Fenced code blocks are highlighted in the page viewer and the live preview
+using the fence's language hint:
+
+````markdown
+```py
+import os
+print("hello")
+```
+
+```cpp
+#include <iostream>
+```
+
+```bash
+echo "shell"
+```
+
+```xml
+<root>markup</root>
+```
+
+```yaml
+key: value
+```
+````
+
+Highlighting is done server-side with Pygments (added by `requirements.txt`),
+so it works fully offline and supports hundreds of languages/aliases (`python3`,
+`c++`, `sh`, `yml`, `json`, `html`, `css`, `js`, …). Blocks with no hint or an
+unknown hint render as plain code. The token colors ship with the default
+stylesheet (Pygments "default" light palette); custom themes can override any
+`.codehilite …` token rule in `.qmd.css`.
+
 ### Mathematical Equations
 
 The web interface supports MathJax for rendering mathematical equations:
@@ -344,6 +380,7 @@ The application uses a `ConfigurationManager` that the web interface accesses:
 - PyYAML>=6.0
 - Flask>=3.0.0
 - markdown>=3.5.0
+- Pygments>=2.0 (code-fence syntax highlighting; rendering degrades to plain-code blocks without it)
 
 ### System Dependencies
 - ffmpeg (for video processing)

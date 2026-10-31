@@ -11,6 +11,37 @@ from datetime import datetime
 from utils import image_handler, video_handler, drawio_handler
 from utils.theme import resolve_theme
 
+# Optional dependency for code-fence syntax highlighting (```py, ```cpp,).
+# The codehilite markdown extension uses Pygments when it is present; without
+# it, markdown still renders and code blocks simply stay plain.
+try:
+    import pygments  # noqa: F401
+    PYGMENTS_AVAILABLE = True
+except ImportError:
+    PYGMENTS_AVAILABLE = False
+
+
+def _markdown_extensions():
+    """Markdown extension list for page rendering.
+
+    'extra' provides tables, fenced code, attribute lists, etc. 'codehilite'
+    adds Pygments syntax highlighting to fenced code blocks using the fence's
+    language hint (```py, ```cpp, ```bash, ```xml, ```yaml, …) — and it is
+    only active when the optional Pygments dependency is importable.
+    """
+    extensions = ['extra']
+    if PYGMENTS_AVAILABLE:
+        extensions.append('codehilite')
+    return extensions
+
+
+_CODEHILITE_CONFIG = {'codehilite': {
+    # Only highlight blocks whose fence names a language (guessing plain-text
+    # snippets produces misleading color). Unknown hints render as plain code.
+    'guess_lang': False,
+    'css_class': 'codehilite',
+}}
+
 # Absolute path to this application's own directory (the quick-md/ folder).
 # Used to keep search / page listings from indexing the app's own docs.
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -124,6 +155,21 @@ class WebServer:
         html_content = re.sub(r'<source\b[^\u003e]*\u003e', _fix_source_tag, html_content)
 
         return html_content
+
+    def _render_markdown(self, content):
+        """Render markdown source to the HTML used by the viewer and preview.
+
+        Runs the list-fix and media-path normalizers and applies syntax
+        highlighting to fenced code blocks when Pygments is available.
+        """
+        content = self._fix_lists(content)
+        extensions = _markdown_extensions()
+        html = markdown.markdown(
+            content,
+            extensions=extensions,
+            extension_configs=_CODEHILITE_CONFIG if 'codehilite' in extensions else {},
+        )
+        return self._fix_media_paths(html)
     
     def _extract_title_from_markdown(self, content):
         """Extract the first H1 title from markdown content"""
@@ -394,9 +440,7 @@ class WebServer:
             with open(filepath, 'r') as f:
                 content = f.read()
             
-            content = self._fix_lists(content)
-            html_content = markdown.markdown(content, extensions=['extra'])
-            html_content = self._fix_media_paths(html_content)
+            html_content = self._render_markdown(content)
             
             # Extract page title
             page_title = self._extract_title_from_markdown(content) or filename
@@ -752,9 +796,7 @@ class WebServer:
         @self._check_password
         def markdown_preview():
             content = request.json.get('content', '')
-            content = self._fix_lists(content)
-            html = markdown.markdown(content, extensions=['extra'])
-            html = self._fix_media_paths(html)
+            html = self._render_markdown(content)
             return jsonify({'html': html})
         
         @self.app.route('/api/media_list')
