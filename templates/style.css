@@ -2,31 +2,32 @@
    Default palette derived from base=#f4f5f7, surface=#ffffff,
    accent=#3498db.  Override by placing a .qmd.css file in the notebook
    directory (next to .qmd_conf). */
+
 :root {
-    --c-base: #f4f5f7;
-    --c-surface: #ffffff;
-    --c-accent: #3498db;
-    --c-text: #1b1f24;
-    --c-text-on-base: #1b1f24;
-    --c-text-on-accent: #f3f5f8;
-    --c-muted: #828487;
-    --c-border: #dfe0e0;
-    --c-accent-hover: #56a9e0;
-    --c-active-line: #efeff0;
-    --c-selection: rgba(52, 152, 219, 0.25);
-    --c-gutter: #8d8f92;
-    --c-ok: #2e8b57;
-    --c-ok-bg: rgba(46, 139, 87, 0.14);
-    --c-ok-border: rgba(46, 139, 87, 0.35);
-    --c-err: #d65a5a;
-    --c-err-bg: rgba(214, 90, 90, 0.14);
-    --c-err-border: rgba(214, 90, 90, 0.35);
-    --c-warn: #e08a2e;
-    --c-warn-bg: rgba(224, 138, 46, 0.14);
-    --c-warn-border: rgba(224, 138, 46, 0.35);
+    --c-base: #f0ebe3;
+    --c-surface: #faf6f0;
+    --c-accent: #9c6b3e;
+    --c-text: #2e2925;
+    --c-text-on-base: #2e2925;
+    --c-text-on-accent: #faf6f0;
+    --c-muted: #8a7f73;
+    --c-border: #d9d3c9;
+    --c-accent-hover: #b88258;
+    --c-active-line: #ede8df;
+    --c-selection: rgba(156, 107, 62, 0.25);
+    --c-gutter: #a89f94;
+    --c-ok: #4a7c59;
+    --c-ok-bg: rgba(74, 124, 89, 0.14);
+    --c-ok-border: rgba(74, 124, 89, 0.35);
+    --c-err: #a84a4a;
+    --c-err-bg: rgba(168, 74, 74, 0.14);
+    --c-err-border: rgba(168, 74, 74, 0.35);
+    --c-warn: #b8852e;
+    --c-warn-bg: rgba(184, 133, 46, 0.14);
+    --c-warn-border: rgba(184, 133, 46, 0.35);
     --content-width: 1200px;
     --radius: 8px;
-    --shadow: 0 2px 8px rgba(0,0,0,0.08);
+    --shadow: 0 2px 8px rgba(46, 41, 37, 0.08);
 }
 
 * {
