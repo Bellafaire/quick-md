@@ -92,6 +92,66 @@ class WebServer:
                                 result.append('')
         return '\n'.join(result)
     
+    def _fix_nested_lists(self, content):
+        """Re-indent list items so GitHub-style nesting renders nested.
+
+        Notebooks written in the GitHub style indent nested bullets by a
+        visually small amount (commonly 2 spaces under a '- ' marker), but
+        Python-Markdown requires 4 absolute spaces per nesting level, so
+        such children render as siblings (or as code blocks) instead of
+        nested lists. This preprocessor maps the relative indentation of
+        list lines onto Python-Markdown's absolute rule: each nesting
+        level becomes exactly 4 spaces.
+
+        Guards so unrelated content is untouched:
+        - fenced code blocks (``` / ~~~) pass through unmodified;
+        - a non-blank line at column 0 that is not a list item (paragraph,
+          heading, ...) ends the surrounding list context;
+        - blank lines keep the context open (loose lists still nest);
+        - tabs are expanded to 4-space stops first.
+
+        Levels are assigned by comparing raw leading-space widths, which
+        reproduces GitHub's behaviour for consistently-indented sources
+        (2 or 3 spaces per level, tabs, and python-markdown's own 4-space
+        style all render nested).
+        """
+        list_re = re.compile(r'^([ \t]*)([-*+>][ \t]+|\d{1,9}[.)][ \t]+)')
+        fence_re = re.compile(r'^([ \t]*)(```+|~~~+)')
+        lines = content.split('\n')
+        result = []
+        stack = []  # leading-space widths of currently-open nesting levels
+        in_fence = False
+        for line in lines:
+            fence_match = fence_re.match(line)
+            if fence_match:
+                in_fence = not in_fence
+                if len(fence_match.group(1).expandtabs(4)) == 0:
+                    stack.clear()
+                result.append(line)
+                continue
+            if in_fence:
+                result.append(line)
+                continue
+            if not line.strip():
+                result.append(line)
+                continue
+            list_match = list_re.match(line)
+            if list_match:
+                width = len(list_match.group(1).expandtabs(4))
+                while stack and stack[-1] >= width:
+                    stack.pop()
+                stack.append(width)
+                level = len(stack) - 1
+                result.append('    ' * level + line[list_match.end(1):])
+            else:
+                # Any other column-0 content (paragraph, heading, …) closes
+                # the list context; indented continuations of a list item's
+                # text keep it open.
+                if len(re.match(r'^[ \t]*', line).group(0).expandtabs(4)) == 0:
+                    stack.clear()
+                result.append(line)
+        return '\n'.join(result)
+
     def _fix_media_paths(self, html_content):
         """Normalize media paths to root-relative paths for the web view.
 
@@ -163,6 +223,7 @@ class WebServer:
         highlighting to fenced code blocks when Pygments is available.
         """
         content = self._fix_lists(content)
+        content = self._fix_nested_lists(content)
         extensions = _markdown_extensions()
         html = markdown.markdown(
             content,

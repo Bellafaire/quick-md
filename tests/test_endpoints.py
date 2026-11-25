@@ -587,6 +587,88 @@ class TestMarkdownPreview:
         assert 'src="/images/photo.png"' in data["html"]
         assert "/media/" not in data["html"]
 
+    def test_preview_nests_github_style_lists(self, app_client):
+        """Notebooks in the GitHub style indent nested bullets by 2 spaces
+        under a '- ' marker; Python-Markdown demands 4 absolute spaces per
+        level and would otherwise flatten the child into a sibling <li>.
+        Rendered HTML must reflect the nesting (child <ul> inside the
+        parent <li>), which the list CSS then indents further right."""
+        content = (
+            "- SATA LSI card to interface with the drives\n"
+            "  - hello\n"
+            "- Power Connectors for HDD backplane\n"
+        )
+        resp = app_client.post("/api/markdown_preview", json={"content": content})
+        html = resp.get_json()["html"].replace("\n", "")
+        assert "<li>SATA LSI card to interface with the drives<ul>" in html
+        assert "<li>hello</li></ul>" in html
+        assert "<li>Power Connectors for HDD backplane</li>" in html
+
+    def test_preview_nests_multi_level_lists(self, app_client):
+        """Each additional relative indent step becomes one more nesting
+        level (2 spaces per level here; tabs behave the same because they
+        expand to 4-space stops)."""
+        content = (
+            "- top\n"
+            "  - second\n"
+            "    - third\n"
+            "  - second again\n"
+            "- top again\n"
+        )
+        resp = app_client.post("/api/markdown_preview", json={"content": content})
+        html = resp.get_json()["html"].replace("\n", "")
+        assert "<li>second<ul>" in html
+        assert "<li>third</li></ul>" in html
+        assert "<li>top again</li>" in html
+        # The deepest item must not escape as a sibling bullet.
+        assert "<li>top<ul>" in html
+
+    def test_preview_nested_lists_untouched_by_fences(self, app_client):
+        """List-looking lines inside fenced code blocks must pass through
+        the nesting fix verbatim — they are code, not structure."""
+        content = (
+            "```\n"
+            "- parent\n"
+            "  - child\n"
+            "```\n"
+            "- parent\n"
+            "  - child\n"
+        )
+        resp = app_client.post("/api/markdown_preview", json={"content": content})
+        html = resp.get_json()["html"]
+        # Inside the fence: raw text with original indentation preserved.
+        assert "- parent" in html
+        assert "  - child" in html
+        # Outside the fence: real nested list output.
+        assert "<li>parent<ul>" in html
+
+    def test_preview_nested_lists_reset_between_paragraphs(self, app_client):
+        """A paragraph (column-0, non-list text) between two lists closes
+        the list context: a 2-space list after it starts fresh instead of
+        being treated as a deeper level of the previous list."""
+        content = (
+            "- first list\n"
+            "  - nested\n"
+            "\n"
+            "Middle paragraph.\n"
+            "\n"
+            "- second list\n"
+            "  - nested again\n"
+        )
+        resp = app_client.post("/api/markdown_preview", json={"content": content})
+        html = resp.get_json()["html"].replace("\n", "")
+        assert "<p>Middle paragraph.</p>" in html
+        assert "<li>first list<ul><li>nested</li></ul></li></ul>" in html
+        assert "<li>second list<ul><li>nested again</li></ul></li></ul>" in html
+
+    def test_preview_tab_indented_lists_still_nest(self, app_client):
+        """Tab-indented nesting (the original style) must keep working."""
+        content = "- parent\n\t- child\n- next\n"
+        resp = app_client.post("/api/markdown_preview", json={"content": content})
+        html = resp.get_json()["html"].replace("\n", "")
+        assert "<li>parent<ul>" in html
+        assert "<li>child</li></ul>" in html
+
 
 class TestMediaListAPI:
     """The /api/media_list endpoint returns registered media metadata."""
@@ -654,6 +736,27 @@ class TestStyleEndpoint:
         assert re.search(
             r"\.markdown-content thead th\s*\{[^}]*border-bottom:\s*2px\s+solid\s+var\(--c-border\)",
             css, re.S)
+
+    def test_style_css_indents_markdown_lists(self, app_client):
+        """List bullets must be indented right of the body text and nested
+        lists must indent further than their parent. The global * reset
+        strips the browser default ul/ol padding, so the default stylesheet
+        must restore it: top-level ul/ol get padding-left, and nested
+        li > ul / li > ol get their own padding-left so each nesting level
+        (a tab in the markdown source) renders one step further right."""
+        css = app_client.get("/style.css").data.decode()
+        # Top-level lists are indented.
+        list_block = re.search(
+            r"\.markdown-content ul,\s*\.markdown-content ol\s*\{([^}]*)\}", css)
+        assert list_block, "missing .markdown-content ul/ol rules"
+        assert re.search(r"padding-left:\s*[\d.]+rem", list_block.group(1)), \
+            "top-level lists must have padding-left"
+        # Nested lists indent further than their parent bullet.
+        nested_block = re.search(
+            r"\.markdown-content li > ul,\s*\.markdown-content li > ol\s*\{([^}]*)\}", css)
+        assert nested_block, "missing nested li > ul/ol rules"
+        assert re.search(r"padding-left:\s*[\d.]+rem", nested_block.group(1)), \
+            "nested lists must have their own padding-left"
 
 
 class TestHandlerFunctions:

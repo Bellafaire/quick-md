@@ -476,6 +476,25 @@ label {
     border-radius: 4px;
 }
 
+/* ---- Markdown lists: indent bullets inside the body text ----
+
+   The global * reset above removes the browser's default ul/ol padding,
+   which left list markers hanging at the container's left edge (left of
+   body text) and nested lists starting at the same level as their parent
+   bullet. Restore the indent on all lists; every nesting level indents
+   further because the nested<ul> rule applies to each depth. */
+.markdown-content ul,
+.markdown-content ol {
+    padding-left: 1.6rem;
+    margin: 1rem 0;
+}
+
+.markdown-content li > ul,
+.markdown-content li > ol {
+    margin: 0.15rem 0;
+    padding-left: 1.6rem;
+}
+
 /* ---- Markdown tables: centered and readable ----
 
    Tables shrink to fit their content, sit centered in the page, and gain
