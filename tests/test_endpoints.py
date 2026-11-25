@@ -235,6 +235,123 @@ class TestPageViewing:
         # The markdown link should still point to the .md file
         assert "2026_01_02_reading_the_docs.md" in html
 
+    def test_view_renders_heading_ids_for_toc(self, app_client):
+        """Headings get stable ids (toc extension) so the TOC can link to
+        them; duplicate headings are de-duplicated with _N suffixes."""
+        page = app_client._tmp_dir
+        with open(os.path.join(page, "2026_01_01_my_first_build.md")):
+            pass
+        content = (
+            "# Build Notes\n"
+            "\n"
+            "## Setup\n"
+            "\n"
+            "## Setup\n"
+            "\n"
+            "### Wiring\n"
+        )
+        with open(os.path.join(page, "2026_01_01_my_first_build.md"), "w") as f:
+            f.write(content)
+        html = app_client.get("/page/2026_01_01_my_first_build.md").data.decode()
+        assert 'id="setup"' in html
+        assert 'id="setup_1"' in html
+        assert 'id="wiring"' in html
+
+    def test_view_page_shows_toc_sidebar(self, app_client):
+        """A page with headings renders a TOC sidebar: one link per heading,
+        pointing at the heading ids, with one indent step per level via
+        nested <ul>s (h1 flush left, h2 one step in, h3 two, …).
+
+        Layout contract: the panel holds on the left like the editor view's
+        media library — sticky, near-full viewport height, with the "Table
+        of Contents" title pinned at the top (outside the scroll area) and
+        the entries scrolling below it. The cluster is centered so the
+        reading column is not pushed right."""
+        page = app_client._tmp_dir
+        content = (
+            "# Build Notes\n"
+            "\n"
+            "## Setup\n"
+            "\n"
+            "### Wiring\n"
+            "\n"
+            "# Next Part\n"
+        )
+        with open(os.path.join(page, "2026_01_01_my_first_build.md"), "w") as f:
+            f.write(content)
+        html = app_client.get("/page/2026_01_01_my_first_build.md").data.decode()
+        assert 'class="toc-sidebar' in html
+        assert 'Table of Contents' in html
+        # One link per heading, in document order, targeting the ids.
+        assert 'href="#build-notes">Build Notes</a>' in html
+        assert 'href="#setup">Setup</a>' in html
+        assert 'href="#wiring">Wiring</a>' in html
+        assert 'href="#next-part">Next Part</a>' in html
+        # Nesting: Wiring sits inside Setup's <ul>, which sits inside
+        # Build Notes' <ul>, which sits inside the root <ul> — three open
+        # <ul>s before Wiring's link (h3 = two indent steps in).
+        toc_start = html.index('class="toc-list"')
+        toc_html = html[toc_start:]
+        wiring_pos = toc_html.index('href="#wiring"')
+        assert toc_html[:wiring_pos].count("<ul>") == 3
+        # Next Part follows at root level: the two sublists opened for it
+        # (Setup's and Wiring's) are closed again before its link.
+        next_pos = toc_html.index('href="#next-part"')
+        assert toc_html[wiring_pos:next_pos].count("</ul>") >= 2
+        # Media-library-style hold: fixed panel in the page margin (outside
+        # the centered container), title at top, entries wrap (no
+        # nowrap/ellipsis) and the whole panel scrolls if very long.
+        nav_pos = html.index('aria-label="Table of contents"')
+        wrap_pos = html.index('toc-list-wrap', nav_pos)
+        assert html.index('<h3>Table of Contents</h3>', nav_pos) < wrap_pos
+        css = re.search(r"\.toc-sidebar \{([^}]*)\}", html).group(1)
+        assert "position: fixed" in css
+        assert "left: 1rem" in css
+        # Height hugs the entries: no bottom anchor, capped by viewport.
+        assert "bottom:" not in css
+        assert "max-height: calc(100vh - 5rem)" in css
+        assert re.search(r"\.toc-list-wrap\s*\{[^}]*overflow-y:\s*auto", html)
+        # The nav must render OUTSIDE/before the centered content card.
+        card_pos = html.index('<div class="card">', nav_pos)
+        assert nav_pos < card_pos
+        # Entries wrap for readability instead of scrolling or clipping.
+        link_css = re.search(r"\.toc-sidebar \.toc-list a \{([^}]*)\}", html).group(1)
+        assert "overflow-wrap: break-word" in link_css
+        assert "white-space: nowrap" not in link_css
+        assert "text-overflow" not in link_css
+        # Hidden only when the margin is truly gone; width tiers down
+        # (280 → 220 → 180px) as the viewport narrows before that.
+        tier = re.search(r"@media \(max-width: 1820px\)\s*\{\s*\.toc-sidebar\s*\{[^}]*width:\s*220px", html)
+        assert tier, "missing 220px width tier"
+        assert re.search(r"@media \(max-width: 1650px\)\s*\{\s*\.toc-sidebar\s*\{[^}]*width:\s*180px", html), "missing 180px width tier"
+        assert re.search(r"@media \(max-width: 1560px\)\s*\{\s*\.toc-sidebar\s*\{[^}]*display:\s*none", html)
+
+    def test_view_page_hides_toc_in_raw_mode(self, app_client):
+        """toggleView() must hide the TOC in raw mode — the headings it
+        links to no longer exist on screen."""
+        page = app_client._tmp_dir
+        with open(os.path.join(page, "2026_01_01_my_first_build.md")) as f:
+            content = f.read()
+        assert "#" in content  # fixture page has headings, so TOC renders
+        html = app_client.get("/page/2026_01_01_my_first_build.md").data.decode()
+        assert "tocSidebar" in html
+        assert "tocSidebar.style.display = 'none'" in html
+        assert "tocSidebar.style.display = ''" in html
+
+    def test_view_page_without_headings_has_no_toc(self, app_client):
+        """A page without headings renders without the TOC layout — the
+        viewer template keeps its original single-column structure."""
+        page = app_client._tmp_dir
+        with open(os.path.join(page, "2026_01_02_reading_the_docs.md")) as f:
+            pass
+        with open(os.path.join(page, "2026_01_02_reading_the_docs.md"), "w") as f:
+            f.write("Just some text.\n\nNo headings here.\n")
+        html = app_client.get("/page/2026_01_02_reading_the_docs.md").data.decode()
+        assert 'class="toc-sidebar' not in html
+        assert 'aria-label="Table of contents"' not in html
+        # ...but the page still renders its content.
+        assert "No headings here." in html
+
 
 class TestMediaServing:
     """Static media files are served from the correct URL paths."""

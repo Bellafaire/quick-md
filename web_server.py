@@ -222,15 +222,58 @@ class WebServer:
         Runs the list-fix and media-path normalizers and applies syntax
         highlighting to fenced code blocks when Pygments is available.
         """
+        html, _toc = self._render_markdown_with_toc(content, with_toc=False)
+        return html
+
+    def _render_markdown_with_toc(self, content, with_toc=True):
+        """Render markdown source, optionally returning a table of contents.
+
+        Returns (html, toc_html). ``toc_html`` is a nested <ul> of links to
+        the page's headings (or '' when the page has no headings). The ids
+        are added with the 'toc' extension using slugify_unicode so headings
+        in any alphabet get readable permalinks; with_toc=False skips the
+        extension entirely and is used for the editor preview.
+        """
         content = self._fix_lists(content)
         content = self._fix_nested_lists(content)
         extensions = _markdown_extensions()
-        html = markdown.markdown(
-            content,
+        if with_toc:
+            extensions.append('toc')
+        md = markdown.Markdown(
             extensions=extensions,
             extension_configs=_CODEHILITE_CONFIG if 'codehilite' in extensions else {},
         )
-        return self._fix_media_paths(html)
+        html = md.convert(content)
+        if not with_toc:
+            return self._fix_media_paths(html), ''
+
+        # Flatten the extension's nested toc_tokens into a simple nested UL
+        # with the user's requested indentation: one tab-stop per heading
+        # level (h1 flush left, h2 one tab in, h3 two, …).
+        toc_tokens = md.toc_tokens
+        if not toc_tokens:
+            return self._fix_media_paths(html), ''
+
+        lines = []
+        min_level = min(t['level'] for t in toc_tokens)
+
+        def emit(tokens):
+            if not tokens:
+                return
+            lines.append('<ul>')
+            for t in tokens:
+                # t['name'] is already HTML-escaped by the toc extension
+                # (&, <, > are entities; raw tags are stripped), so use it
+                # as-is to avoid double-escaping.
+                lines.append(
+                    f'<li><a href="#{t["id"]}">{t["name"]}</a>')
+                emit(t.get('children'))
+                lines.append('</li>')
+            lines.append('</ul>')
+
+        emit(toc_tokens)
+        return self._fix_media_paths(html), '\n'.join(lines)
+
     
     def _extract_title_from_markdown(self, content):
         """Extract the first H1 title from markdown content"""
@@ -501,7 +544,7 @@ class WebServer:
             with open(filepath, 'r') as f:
                 content = f.read()
             
-            html_content = self._render_markdown(content)
+            html_content, toc_html = self._render_markdown_with_toc(content)
             
             # Extract page title
             page_title = self._extract_title_from_markdown(content) or filename
@@ -510,6 +553,7 @@ class WebServer:
                                    filename=filename, 
                                    content=content, 
                                    html_content=html_content,
+                                   toc_html=toc_html,
                                    page_title=page_title)
         
         @self.app.route('/edit/<path:filename>')

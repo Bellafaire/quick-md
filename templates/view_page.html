@@ -6,15 +6,129 @@
 
 {% block extra_css %}
 <style>
+    /* ---- Table of contents (page view) ----
+       Floats in the page's left margin, OUTSIDE the centered container.
+       The main card keeps its original centered position and width — the
+       TOC never takes layout space. The panel is `fixed`, so it holds in
+       place while the document scrolls, with the "Table of Contents"
+       title at the top and the entries below it, wrapping long titles to
+       multiple lines for easy reading. It only shows when the viewport is
+       wide enough to have a left margin beside the container; otherwise
+       it stays hidden (no reflow, no overlap). */
+    .toc-sidebar {
+        position: fixed;
+        left: 1rem;
+        top: 4rem;
+        /* Height hugs the entries: no bottom anchor, so a short list gets
+           a short panel. max-height keeps it on screen when a page has
+           many headings — the title stays pinned and the entries scroll
+           inside .toc-list-wrap. (4rem top offset + 1rem breathing room.) */
+        max-height: calc(100vh - 5rem);
+        width: 280px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 1rem;
+        z-index: 10;
+        font-size: 1rem;
+    }
+
+    .toc-sidebar h3 {
+        margin: 0 0 0.5rem 0;
+        flex-shrink: 0;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--c-muted);
+    }
+
+    .toc-list-wrap {
+        flex: 1;
+        min-height: 0;
+        /* Only the entries scroll (when max-height kicks in); the panel
+           itself always ends where the last entry ends. */
+        overflow-y: auto;
+    }
+
+    .toc-sidebar .toc-list {
+        margin: 0;
+        padding-left: 0;
+        list-style: none;
+    }
+
+    /* Indent by heading level: h1 flush left, each deeper level one step. */
+    .toc-sidebar .toc-list ul {
+        margin: 0;
+        padding-left: 1rem;
+        list-style: none;
+    }
+
+    .toc-sidebar .toc-list li {
+        margin: 0.15rem 0;
+    }
+
+    .toc-sidebar .toc-list a {
+        display: block;
+        color: var(--c-muted);
+        font-size: 1rem;
+        text-decoration: none;
+        border-radius: 4px;
+        padding: 0.15rem 0.4rem;
+        /* Long entries wrap instead of scrolling or being cut off. */
+        overflow-wrap: break-word;
+    }
+
+    .toc-sidebar .toc-list a:hover {
+        color: var(--c-accent);
+        background: var(--c-active-line);
+    }
+
+    /* Visibility tiers — the TOC floats wherever the viewport has a left
+       margin beside the centered container, shrinking with it as the
+       margin narrows (a smaller panel needs less margin; at the tight end
+       it tucks under the card's ~24px padding without ever covering
+       text), and hides entirely once even that doesn't fit:
+         ≥1821px — 280px panel, fully clear
+         1651–1820px — 220px panel
+         1561–1650px — 180px panel
+         ≤1560px — hidden (margin too small even for the tuck) */
+    @media (max-width: 1820px) {
+        .toc-sidebar {
+            width: 220px;
+        }
+    }
+
+    @media (max-width: 1650px) {
+        .toc-sidebar {
+            width: 180px;
+        }
+    }
+
+    @media (max-width: 1560px) {
+        .toc-sidebar {
+            display: none;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
+{% if toc_html %}
+<nav class="toc-sidebar card" aria-label="Table of contents">
+    <h3>Table of Contents</h3>
+    <div class="toc-list-wrap">
+        <div class="toc-list">
+            {{ toc_html|safe }}
+        </div>
+    </div>
+</nav>
+{% endif %}
+
 <div class="card">
     <div id="rendered-view" class="markdown-content">
         {{ html_content|safe }}
     </div>
-    
+
     <div id="raw-view" class="code-display" style="display: none;">
         <pre>{{ content }}</pre>
     </div>
@@ -34,17 +148,27 @@ function toggleView() {
     const renderedView = document.getElementById('rendered-view');
     const rawView = document.getElementById('raw-view');
     const toggleBtn = document.getElementById('toggle-btn');
-    
+    const tocSidebar = document.querySelector('.toc-sidebar');
+
     showingRaw = !showingRaw;
-    
+
     if (showingRaw) {
         renderedView.style.display = 'none';
         rawView.style.display = 'block';
         toggleBtn.textContent = 'Show Rendered';
+        // Headings disappear with the rendered view, so the TOC has
+        // nothing to point at — hide it and let the raw text use the
+        // full width.
+        if (tocSidebar) {
+            tocSidebar.style.display = 'none';
+        }
     } else {
         renderedView.style.display = 'block';
         rawView.style.display = 'none';
         toggleBtn.textContent = 'Show Raw';
+        if (tocSidebar) {
+            tocSidebar.style.display = '';
+        }
     }
 }
 {% endblock %}
