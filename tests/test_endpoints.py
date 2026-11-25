@@ -521,6 +521,12 @@ class TestEditorInsertionHelpers:
         assert re.search(r"\.container\s*\{[^}]*flex:\s*1", block)
         assert re.search(r"\.container\s*\{[^}]*min-height:\s*0", block)
         assert re.search(r"\.container\s*\{[^}]*margin-bottom:\s*1rem", block)
+        # Width must NEVER depend on the content: the container is a flex
+        # item in the column-flex body, so auto horizontal margins disable
+        # cross-axis stretch and would collapse the page to the width of
+        # its content (an empty new page condensed the whole editor). It
+        # must declare width:100% (centered via max-width + auto margins).
+        assert re.search(r"\.container\s*\{[^}]*width:\s*100%", block)
         # Sidebar and editor pane stretch to the bottom edge.
         assert re.search(r"\.editor-layout\s*\{[^}]*align-items:\s*stretch", block)
         assert re.search(r"\.media-sidebar\s*\{[^}]*max-height:\s*none", block)
@@ -533,6 +539,7 @@ class TestEditorInsertionHelpers:
         # Definite-height chain down to the editor contents.
         assert re.search(r"#editor-wrapper\s*\{[^}]*min-height:\s*0", block)
         assert re.search(r"#editor-wrapper #editor-panel\s*\{[^}]*min-height:\s*0", block)
+        assert re.search(r"#editor-wrapper #editor-panel\s*\{[^}]*flex:\s*1", block)
         assert re.search(r"#codemirror-editor\s*\{[^}]*min-height:\s*0", block)
         # Editor + preview must fill the pane: the 70vh caps are lifted.
         assert re.search(r"#editor-wrapper\.split #codemirror-editor \.cm-editor\s*\{[^}]*height:\s*100%", block)

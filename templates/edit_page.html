@@ -559,6 +559,15 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
+            /* Explicit full width: as a flex item in a column flex body,
+               auto horizontal margins would disable cross-axis stretch and
+               collapse the page to its content's width (an empty editor
+               would condense the whole page). width:100% + the max-width
+               cap + auto side margins from style.css keep it centered —
+               independent of content size. */
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
             /* Keep the 1rem the container already had above the content
                (as under the nav) and mirror it below. */
             margin-top: 1rem;
@@ -610,6 +619,11 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
+            /* Fill the wrapper vertically even when the document is short
+               (flex-grow:0 would hug content and leave the card's lower
+               part empty). In .split mode the wrapper is a grid, where
+               flex is ignored and the 1fr rows size the panels. */
+            flex: 1;
         }
         #editor-wrapper.split #preview-panel {
             display: flex;
