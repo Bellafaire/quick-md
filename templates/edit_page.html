@@ -456,6 +456,118 @@
             max-height: 90vh;
         }
     }
+
+    /* ---- Full-height editor (Feature: media sidebar + editor pane reach
+       the bottom of the page; no page scrolling) ----
+
+       Declared last so these override the same-specificity rules above
+       (e.g. the 70vh editor heights and the .split display rules). Scoped
+       to wide screens: below 769px the stacked mobile layout keeps its
+       natural page-scrolling heights.
+
+       The page becomes an app-style column that fills the viewport and
+       never scrolls: nav on top, a flex-growing .container, 1rem padding
+       top and bottom (the same 1rem the container already had above the
+       content). The definite height chain (min-height: 0 at every flex
+       level) lets the media sidebar and the editor pane stretch to the
+       bottom edge while the CodeMirror editor, preview, and media list
+       keep their OWN scrollbars. The Save/Exit button row stays pinned at
+       the bottom of the pane, always visible. */
+    @media (min-width: 769px) {
+        body {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            /* The layout must never push a scrollbar onto the page: all
+               scrolling happens inside the editor, preview and media list. */
+            overflow: hidden;
+        }
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            /* Keep the 1rem the container already had above the content
+               (as under the nav) and mirror it below. */
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+        .editor-layout {
+            flex: 1;
+            align-items: stretch;
+            min-height: 0;
+        }
+        /* The re-show button must not stretch with the row. */
+        #sidebar-show-btn {
+            align-self: flex-start;
+        }
+        /* Sidebar stretches to the bottom; its media list scrolls. */
+        .media-sidebar {
+            max-height: none;
+        }
+        /* The main editor area is a column whose card fills it. */
+        .editor-main {
+            display: flex;
+            flex-direction: column;
+        }
+        .editor-main .card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            margin-bottom: 0;
+        }
+        #message {
+            flex-shrink: 0;
+        }
+        /* The editor wrapper grows to use the card's remaining height. */
+        #editor-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        /* In split mode the wrapper is a grid: one row per panel, each an
+           equal share of the full height (side-by-side => one row; stacked
+           769-968px => two rows). */
+        #editor-wrapper.split {
+            display: grid;
+            grid-auto-rows: 1fr;
+        }
+        #editor-wrapper #editor-panel {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        #editor-wrapper.split #preview-panel {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        /* The CodeMirror editor fills the panel; its scroller keeps the
+           internal scrollbar. The .split cm height selector is
+           re-declared to beat the identical 70vh rule above. */
+        #codemirror-editor {
+            flex: 1;
+            min-height: 0;
+        }
+        #codemirror-editor .cm-editor {
+            height: 100%;
+        }
+        #editor-wrapper.split #codemirror-editor .cm-editor {
+            height: 100%;
+        }
+        /* Save/Exit button row stays pinned at the bottom of the pane. */
+        .page-footer {
+            flex-shrink: 0;
+        }
+        /* The preview fills the rest of its panel with its own scrollbar. */
+        #preview {
+            height: auto;
+            flex: 1;
+            min-height: 0;
+        }
+    }
 </style>
 {% endblock %}
 

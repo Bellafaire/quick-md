@@ -368,6 +368,63 @@ class TestEditorInsertionHelpers:
         assert "vimCompartment.of" in body and "basicSetup" in body
         assert body.index("vimCompartment.of") < body.index("basicSetup")
 
+    def test_edit_page_media_library_and_editor_reach_page_bottom(self, app_client):
+        """On the edit page the media sidebar and the editor pane must extend
+        all the way to the bottom of the page, with the same padding rhythm
+        used at the top (1rem under the nav, 1rem at the page bottom).
+
+        The page must NOT scroll: it is a viewport-filling app column and
+        all scrolling happens inside the CodeMirror editor, the preview,
+        and the media list. The Save/Preview/Exit button row stays pinned
+        at the bottom of the pane, always visible.
+
+        Implementation contract (all inside edit_page.html's scoped styles,
+        gated to min-width:769px so mobile stacking is unaffected):
+          - page becomes a viewport-filling flex column (nav + container)
+            with overflow hidden so the page itself never scrolls;
+          - .container grows and keeps 1rem margins top and bottom;
+          - .editor-layout stretches its row so sidebar and pane are equal
+            height and reach the bottom;
+          - every flex level carries min-height: 0 so the definite-height
+            chain reaches the CodeMirror editor and the preview;
+          - the 70vh caps on the CodeMirror editor and #preview are lifted
+            to height:100%/flex so both fill the pane;
+          - the button row (.page-footer) cannot shrink away.
+        """
+        page = self._edit_page(app_client)
+        # The block lives in a min-width:769px media query after the 70vh
+        # rules (same-specificity overrides must come later in the sheet).
+        m = re.search(r"@media \(min-width: 769px\) \{(.*)", page, re.S)
+        assert m, "missing min-width:769px block for full-height editor"
+        block = m.group(1)
+        # Page column fills the viewport and never scrolls itself.
+        assert re.search(r"body\s*\{[^}]*height:\s*100vh", block)
+        assert re.search(r"body\s*\{[^}]*overflow:\s*hidden", block)
+        # Container grows inside it; bottom padding mirrors the 1rem top.
+        assert re.search(r"\.container\s*\{[^}]*flex:\s*1", block)
+        assert re.search(r"\.container\s*\{[^}]*min-height:\s*0", block)
+        assert re.search(r"\.container\s*\{[^}]*margin-bottom:\s*1rem", block)
+        # Sidebar and editor pane stretch to the bottom edge.
+        assert re.search(r"\.editor-layout\s*\{[^}]*align-items:\s*stretch", block)
+        assert re.search(r"\.media-sidebar\s*\{[^}]*max-height:\s*none", block)
+        assert re.search(r"\.editor-main\s*\{[^}]*display:\s*flex", block)
+        card = re.search(r"\.editor-main \.card\s*\{([^}]*)\}", block)
+        assert card, "missing .editor-main .card rule"
+        assert "flex: 1" in card.group(1)
+        assert "min-height: 0" in card.group(1)
+        assert "margin-bottom: 0" in card.group(1)
+        # Definite-height chain down to the editor contents.
+        assert re.search(r"#editor-wrapper\s*\{[^}]*min-height:\s*0", block)
+        assert re.search(r"#editor-wrapper #editor-panel\s*\{[^}]*min-height:\s*0", block)
+        assert re.search(r"#codemirror-editor\s*\{[^}]*min-height:\s*0", block)
+        # Editor + preview must fill the pane: the 70vh caps are lifted.
+        assert re.search(r"#editor-wrapper\.split #codemirror-editor \.cm-editor\s*\{[^}]*height:\s*100%", block)
+        assert re.search(r"#preview\s*\{[^}]*height:\s*auto", block)
+        # The Save/Preview/Exit button row stays visible at the bottom.
+        assert re.search(r"\.page-footer\s*\{[^}]*flex-shrink:\s*0", block)
+        # Mobile keeps the original stacked, page-scrolling layout.
+        assert "@media (max-width: 768px)" in page
+
 
 class TestImageUpload:
     """Image upload endpoint and markdown link generation."""
