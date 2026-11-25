@@ -4,10 +4,47 @@
 
 {% block extra_css %}
 <style>
-@keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-}
+    .upload-dropzone {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        min-height: 140px;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        border: 2px dashed var(--c-border);
+        border-radius: var(--radius);
+        background: var(--c-bg);
+        cursor: pointer;
+        text-align: center;
+        transition: border-color 0.15s, background 0.15s;
+    }
+    .upload-dropzone:hover { border-color: var(--c-accent); }
+    .upload-dropzone.dragover {
+        border-color: var(--c-accent);
+        background: var(--c-active-line);
+    }
+    .upload-dropzone-icon { font-size: 1.8rem; line-height: 1; }
+    .upload-dropzone-hint { font-weight: 600; }
+    .upload-dropzone-alt { font-size: 0.85rem; color: var(--c-muted); }
+    .upload-dropzone.has-file .upload-dropzone-hint { color: var(--c-ok); }
+    .upload-dropzone-filename {
+        font-size: 0.85rem;
+        color: var(--c-muted);
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .upload-dropzone-input {
+        width: 0.1px;
+        height: 0.1px;
+        opacity: 0;
+        overflow: hidden;
+        position: absolute;
+        z-index: -1;
+    }
 </style>
 {% endblock %}
 
@@ -22,7 +59,13 @@
         <input type="text" id="title" name="title" placeholder="Enter video title" required>
         
         <label for="file">Select Video:</label>
-        <input type="file" id="file" name="file" accept="video/*,.mp4,.m4v,.mov,.webm,.mkv,.avi,.wmv,.flv,.ogv,.ogg,.mpg,.mpeg,.mpe,.3gp,.3g2,.ts,.m2ts,.mts,.vob,.rm,.rmvb,.asf,.f4v,.dv,.y4m" required>
+        <div class="upload-dropzone" id="upload-video-dropzone" data-for="file"
+             aria-label="Drop a video here, or click to browse">
+            <span class="upload-dropzone-icon">🎬</span>
+            <span class="upload-dropzone-hint">Drag &amp; drop a video here</span>
+            <span class="upload-dropzone-alt">or click to browse…</span>
+        </div>
+        <input type="file" id="file" name="file" accept="video/*,.mp4,.m4v,.mov,.webm,.mkv,.avi,.wmv,.flv,.ogv,.ogg,.mpg,.mpeg,.mpe,.3gp,.3g2,.ts,.m2ts,.mts,.vob,.rm,.rmvb,.asf,.f4v,.dv,.y4m" required style="display:none;">
         
         <label for="resolution">Resolution:</label>
         <select id="resolution" name="resolution">
@@ -144,6 +187,7 @@ function uploadVideo(event) {
                 document.getElementById('result-card').style.display = 'block';
                 event.target.reset();
                 document.getElementById('preview-container').innerHTML = '';
+                if (window.qmdUploadDropzone) window.qmdUploadDropzone.reset(document.getElementById('upload-video-dropzone'));
                 progressContainer.style.display = 'none';
                 showMessage(data.message);
             } else {
@@ -174,4 +218,9 @@ function copyToClipboard() {
         console.error('Failed to copy:', err);
     });
 }
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- Upload dropzone wiring (drag & drop + click-to-browse file input) -->
+<script src="/static/js/qmd-upload-dropzone.js"></script>
 {% endblock %}

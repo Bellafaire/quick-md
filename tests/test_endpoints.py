@@ -876,6 +876,122 @@ class TestMediaListAPI:
             assert not item["path"].startswith("/"), item["path"]
 
 
+class TestUploadDropzones:
+    """Upload dialogs (image + video, editor modal and standalone page)
+    each show a large drop zone that accepts drag & drop AND still opens
+    the native file browser on click.
+
+    The markup contract per dialog is a .upload-dropzone box wired via
+    data-for to the SAME hidden file input the form always had — so the
+    form's `required` validation and the existing preview/upload flow run
+    unchanged regardless of how the file was chosen (drop vs browse).
+    The shared behaviour lives in /static/js/qmd-upload-dropzone.js.
+    """
+
+    def _edit_page(self, app_client):
+        resp = app_client.get("/edit/2026_01_01_my_first_build.md")
+        assert resp.status_code == 200
+        return resp.data.decode()
+
+    def test_edit_modal_image_dropzone_markup(self, app_client):
+        """The image modal has a dropzone box wired to the hidden input."""
+        page = self._edit_page(app_client)
+        assert '<div class="upload-dropzone" id="modal-image-dropzone"' in page
+        assert 'data-for="modal-image-file"' in page
+        # Same file input as before, but now visually hidden (the box
+        # forwards clicks to it).
+        m = re.search(r'<input type="file" id="modal-image-file"[^>]*>', page)
+        assert m
+        assert 'style="display:none;"' in m.group(0)
+        assert 'accept="image/*"' in m.group(0)
+        # Instructional copy inside the box.
+        assert 'Drag &amp; drop an image here' in page
+        assert 'or click to browse' in page
+
+    def test_edit_modal_video_dropzone_markup(self, app_client):
+        """The video modal has the same contract."""
+        page = self._edit_page(app_client)
+        assert '<div class="upload-dropzone" id="modal-video-dropzone"' in page
+        assert 'data-for="modal-video-file"' in page
+        m = re.search(r'<input type="file" id="modal-video-file"[^>]*>', page)
+        assert m
+        assert 'style="display:none;"' in m.group(0)
+        assert 'Drag &amp; drop a video here' in page
+
+    def test_edit_page_loads_dropzone_script(self, app_client):
+        """The shared installer is loaded after the modal DOM exists."""
+        page = self._edit_page(app_client)
+        assert '<script src="/static/js/qmd-upload-dropzone.js"></script>' in page
+        # It must come after the dropzone markup (content block) so the
+        # installer runs when the boxes exist.
+        assert page.index('qmd-upload-dropzone.js') > page.index('modal-image-dropzone')
+
+    def test_standalone_upload_pages_have_dropzones(self, app_client):
+        """/upload_image and /upload_video carry the same contract."""
+        img = app_client.get("/upload_image").data.decode()
+        assert '<div class="upload-dropzone" id="upload-image-dropzone"' in img
+        assert 'data-for="file"' in img
+        assert 'Drag &amp; drop an image here' in img
+        assert re.search(r'<input type="file" id="file"[^>]*style="display:none;"', img)
+        assert '<script src="/static/js/qmd-upload-dropzone.js"></script>' in img
+
+        vid = app_client.get("/upload_video").data.decode()
+        assert '<div class="upload-dropzone" id="upload-video-dropzone"' in vid
+        assert 'data-for="file"' in vid
+        assert 'Drag &amp; drop a video here' in vid
+        assert re.search(r'<input type="file" id="file"[^>]*style="display:none;"', vid)
+        assert '<script src="/static/js/qmd-upload-dropzone.js"></script>' in vid
+
+    def test_dropzone_script_serves_and_behaves(self, app_client):
+        """The shared JS serves, and pins the behavioural contract:
+        drop assigns the drop-event FileList to the input and echoes the
+        filename; click/Enter opens the native file browser; dragover
+        lights the box up; change (browse pick) mirrors to the box."""
+        resp = app_client.get("/static/js/qmd-upload-dropzone.js")
+        assert resp.status_code == 200
+        js = resp.data.decode()
+        # Drop handling: assign the FileList (keeps required validation +
+        # FormData(name="file") intact) and reflect the file name.
+        assert 'addEventListener(\'drop\'' in js
+        assert 'input.files = files' in js
+        assert 'input.dispatchEvent(new Event(\'change\'))' in js
+        assert "nameSpan.textContent = file.name" in js
+        # Click/keyboard -> the same native file browser as before.
+        assert 'input.click()' in js
+        assert "e.key === 'Enter'" in js
+        # Visual feedback while dragging over.
+        assert "classList.add('dragover')" in js
+        assert "classList.remove('dragover')" in js
+        # Browse picks mirror into the box via the input's change event.
+        assert "input.addEventListener('change'" in js
+
+    def test_dropzone_css_feedback_states(self, app_client):
+        """Dropzones are large dashed targets that react to hover and to a
+        file hovering over them (dragover highlight), and hide the raw
+        input control visually."""
+        page = self._edit_page(app_client)
+        dz = re.search(r"\.upload-dropzone \{([^}]*)\}", page)
+        assert dz, "missing .upload-dropzone rule on edit page"
+        assert "min-height: 120px" in dz.group(1)
+        assert "dashed" in dz.group(1)
+        assert re.search(r"\.upload-dropzone\.dragover\s*\{[^}]*border-color", page)
+        assert re.search(r"\.upload-dropzone-input\s*\{[^}]*opacity:\s*0", page)
+
+    def test_open_modal_resets_dropzone_reflection(self, app_client):
+        """Reopening a modal resets the form, so the box's echoed filename
+        must be cleared too (stale file names lie about the form state)."""
+        page = self._edit_page(app_client)
+        for fn in ("openUploadImageModal", "openUploadVideoModal"):
+            body = TestEditorInsertionHelpers._function_body(page, fn)
+            assert "resetUploadDropzone" in body, fn
+        assert "function resetUploadDropzone" in page
+        # And after a standalone upload succeeds the reflection clears too.
+        img = app_client.get("/upload_image").data.decode()
+        assert "window.qmdUploadDropzone.reset" in img
+        vid = app_client.get("/upload_video").data.decode()
+        assert "window.qmdUploadDropzone.reset" in vid
+
+
 class TestStyleEndpoint:
     """The /style.css endpoint serves custom or default CSS."""
 

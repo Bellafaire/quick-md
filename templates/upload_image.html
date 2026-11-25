@@ -2,6 +2,55 @@
 
 {% block title %}Upload Image - Quick-md Notebook{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* ---- Upload dropzone (drag & drop + click to browse) ----
+       Same contract as the editor modals: the box reflects a dropped or
+       picked file and forwards clicks to the hidden native file input. */
+    .upload-dropzone {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        min-height: 140px;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        border: 2px dashed var(--c-border);
+        border-radius: var(--radius);
+        background: var(--c-bg);
+        cursor: pointer;
+        text-align: center;
+        transition: border-color 0.15s, background 0.15s;
+    }
+    .upload-dropzone:hover { border-color: var(--c-accent); }
+    .upload-dropzone.dragover {
+        border-color: var(--c-accent);
+        background: var(--c-active-line);
+    }
+    .upload-dropzone-icon { font-size: 1.8rem; line-height: 1; }
+    .upload-dropzone-hint { font-weight: 600; }
+    .upload-dropzone-alt { font-size: 0.85rem; color: var(--c-muted); }
+    .upload-dropzone.has-file .upload-dropzone-hint { color: var(--c-ok); }
+    .upload-dropzone-filename {
+        font-size: 0.85rem;
+        color: var(--c-muted);
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .upload-dropzone-input {
+        width: 0.1px;
+        height: 0.1px;
+        opacity: 0;
+        overflow: hidden;
+        position: absolute;
+        z-index: -1;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="card">
     <h2>Upload Image</h2>
@@ -13,7 +62,13 @@
         <input type="text" id="title" name="title" placeholder="Enter image title" required>
         
         <label for="file">Select Image:</label>
-        <input type="file" id="file" name="file" accept="image/*" required>
+        <div class="upload-dropzone" id="upload-image-dropzone" data-for="file"
+             aria-label="Drop an image here, or click to browse">
+            <span class="upload-dropzone-icon">🖼️</span>
+            <span class="upload-dropzone-hint">Drag &amp; drop an image here</span>
+            <span class="upload-dropzone-alt">or click to browse…</span>
+        </div>
+        <input type="file" id="file" name="file" accept="image/*" required style="display:none;">
         
         <div id="preview-container" style="margin-bottom: 1rem;"></div>
 
@@ -102,6 +157,7 @@ function uploadImage(event) {
                 document.getElementById('result-card').style.display = 'block';
                 event.target.reset();
                 document.getElementById('preview-container').innerHTML = '';
+                if (window.qmdUploadDropzone) window.qmdUploadDropzone.reset(document.getElementById('upload-image-dropzone'));
                 progressContainer.style.display = 'none';
                 showMessage(data.message);
             } else {
@@ -132,4 +188,9 @@ function copyToClipboard() {
         console.error('Failed to copy:', err);
     });
 }
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- Upload dropzone wiring (drag & drop + click-to-browse file input) -->
+<script src="/static/js/qmd-upload-dropzone.js"></script>
 {% endblock %}

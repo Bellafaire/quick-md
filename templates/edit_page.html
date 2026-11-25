@@ -410,6 +410,78 @@
         box-shadow: 0 4px 16px rgba(0,0,0,0.2);
     }
 
+    /* ---- Upload dropzones (drag & drop + click to browse) ----
+
+       Replace the bare one-line file inputs with a large target box:
+       dropping a file onto it fills the (hidden) file input that the
+       form already submits, and clicking it opens the same native file
+       browser the old input used (via its wrapping <label>). */
+    .upload-dropzone {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        min-height: 120px;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        border: 2px dashed var(--c-border);
+        border-radius: var(--radius);
+        background: var(--c-bg);
+        cursor: pointer;
+        text-align: center;
+        transition: border-color 0.15s, background 0.15s;
+    }
+
+    .upload-dropzone:hover {
+        border-color: var(--c-accent);
+    }
+
+    /* Feedback while a dragged file hovers over the box. */
+    .upload-dropzone.dragover {
+        border-color: var(--c-accent);
+        background: var(--c-active-line);
+    }
+
+    .upload-dropzone-icon {
+        font-size: 1.8rem;
+        line-height: 1;
+    }
+
+    .upload-dropzone-hint {
+        font-weight: 600;
+    }
+
+    .upload-dropzone-alt {
+        font-size: 0.85rem;
+        color: var(--c-muted);
+    }
+
+    /* Filename + preview once a file was picked (drop or browse). */
+    .upload-dropzone.has-file .upload-dropzone-hint {
+        color: var(--c-ok);
+    }
+
+    .upload-dropzone-filename {
+        font-size: 0.85rem;
+        color: var(--c-muted);
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* The hidden input keeps the form field (and `required` validation);
+       only its default one-line control is hidden. */
+    .upload-dropzone-input {
+        width: 0.1px;
+        height: 0.1px;
+        opacity: 0;
+        overflow: hidden;
+        position: absolute;
+        z-index: -1;
+    }
+
     .upload-progress-container {
         margin: 0.75rem 0;
         display: none;
@@ -648,7 +720,14 @@
             <input type="text" id="modal-image-title" name="title" placeholder="Enter image title" required>
 
             <label for="modal-image-file">Select Image:</label>
-            <input type="file" id="modal-image-file" name="file" accept="image/*" required>
+            <div class="upload-dropzone" id="modal-image-dropzone"
+                 data-for="modal-image-file" data-accept="image"
+                 aria-label="Drop an image here, or click to browse">
+                <span class="upload-dropzone-icon">🖼️</span>
+                <span class="upload-dropzone-hint">Drag &amp; drop an image here</span>
+                <span class="upload-dropzone-alt">or click to browse…</span>
+            </div>
+            <input type="file" id="modal-image-file" name="file" accept="image/*" required style="display:none;">
 
             <div id="modal-image-preview" style="margin-bottom: 1rem;"></div>
 
@@ -684,7 +763,14 @@
             <input type="text" id="modal-video-title" name="title" placeholder="Enter video title" required>
 
             <label for="modal-video-file">Select Video:</label>
-            <input type="file" id="modal-video-file" name="file" accept="video/*,.mp4,.m4v,.mov,.webm,.mkv,.avi,.wmv,.flv,.ogv,.ogg,.mpg,.mpeg,.mpe,.3gp,.3g2,.ts,.m2ts,.mts,.vob,.rm,.rmvb,.asf,.f4v,.dv,.y4m" required>
+            <div class="upload-dropzone" id="modal-video-dropzone"
+                 data-for="modal-video-file" data-accept="video"
+                 aria-label="Drop a video here, or click to browse">
+                <span class="upload-dropzone-icon">🎬</span>
+                <span class="upload-dropzone-hint">Drag &amp; drop a video here</span>
+                <span class="upload-dropzone-alt">or click to browse…</span>
+            </div>
+            <input type="file" id="modal-video-file" name="file" accept="video/*,.mp4,.m4v,.mov,.webm,.mkv,.avi,.wmv,.flv,.ogv,.ogg,.mpg,.mpeg,.mpe,.3gp,.3g2,.ts,.m2ts,.mts,.vob,.rm,.rmvb,.asf,.f4v,.dv,.y4m" required style="display:none;">
 
             <label for="modal-video-resolution">Resolution:</label>
             <select id="modal-video-resolution" name="resolution">
@@ -1177,11 +1263,28 @@ document.addEventListener('visibilitychange', function () {
     if (!document.hidden) refreshMediaIfReady();
 });
 
+// ---- Upload dropzones (drag & drop + click to browse) ----
+
+// Shared installer/behaviour lives in /static/js/qmd-upload-dropzone.js
+// (loaded below, after this module's modal code). It wires each
+// .upload-dropzone to its file input: dropping a file fills the input so
+// the form's `required` validation and preview/upload flow run unchanged,
+// and clicking the box opens the input's native file browser.
+
+// Clear the reflected file from the box (modal open resets the form).
+function resetUploadDropzone(dropzone) {
+    dropzone.classList.remove('has-file', 'dragover');
+    const nameSpan = dropzone.querySelector('.upload-dropzone-filename');
+    if (nameSpan) nameSpan.remove();
+}
+
+
 // ---- Upload Image Modal ----
 
 function openUploadImageModal() {
     document.getElementById('upload-image-form').reset();
     document.getElementById('modal-image-preview').innerHTML = '';
+    resetUploadDropzone(document.getElementById('modal-image-dropzone'));
     document.getElementById('image-progress-container').style.display = 'none';
     document.getElementById('image-progress-bar').style.width = '0';
     document.getElementById('image-progress-bar').classList.remove('processing');
@@ -1281,6 +1384,7 @@ function uploadImageFromModal(event) {
 function openUploadVideoModal() {
     document.getElementById('upload-video-form').reset();
     document.getElementById('modal-video-preview').innerHTML = '';
+    resetUploadDropzone(document.getElementById('modal-video-dropzone'));
     document.getElementById('video-progress-container').style.display = 'none';
     document.getElementById('video-progress-bar').style.width = '0';
     document.getElementById('video-progress-bar').classList.remove('processing');
@@ -1500,6 +1604,7 @@ Object.assign(window, {
     openNewDrawioPage, insertMedia, insertPageLink, saveContent, updatePreview, showMessage, exitEditor,
 });
 </script>
+<!-- Upload dropzones (drag & drop + click-to-browse file inputs).
+     Classic script (not module): runs after the modal DOM above exists. -->
+<script src="/static/js/qmd-upload-dropzone.js"></script>
 {% endblock %}
-
-{% block scripts %}{% endblock %}
